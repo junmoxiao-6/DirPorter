@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 ICO = ROOT / "src" / "DirPorter.App" / "Resources" / "app.ico"
-EXE = ROOT / "dist" / "0.2.1" / "dirporter.exe"
+EXE = ROOT / "dist" / "0.3.0" / "dirporter.exe"
 OUT_DIR = ROOT / "tools" / "icon-verify"
 
 
