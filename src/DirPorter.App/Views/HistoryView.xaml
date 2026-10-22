@@ -1,0 +1,109 @@
+<UserControl x:Class="DirPorter.App.Views.HistoryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:markup="clr-namespace:DirPorter.App.Markup"
+             xmlns:svc="clr-namespace:DirPorter.App.Services">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Style="{StaticResource PageTitle}" Text="{markup:Loc hist.title}" />
+
+        <DockPanel Grid.Row="1" Margin="0,0,0,10">
+            <StackPanel Orientation="Horizontal">
+                <Button Content="{markup:Loc common.refresh}" Command="{Binding ReloadCommand}" Margin="0,0,6,0" />
+                <Button Content="{markup:Loc hist.health}" Command="{Binding CheckHealthCommand}" Margin="0,0,6,0" />
+                <Button Content="{markup:Loc hist.exportJson}" Command="{Binding ExportJsonCommand}" Margin="0,0,6,0" />
+                <Button Content="{markup:Loc hist.exportCsv}" Command="{Binding ExportCsvCommand}" />
+            </StackPanel>
+            <TextBlock DockPanel.Dock="Right" Style="{StaticResource Hint}" VerticalAlignment="Center"
+                       HorizontalAlignment="Right" Text="{markup:Loc common.doubleClickHint}" />
+        </DockPanel>
+
+        <Grid Grid.Row="2">
+            <DataGrid ItemsSource="{Binding Records}" SelectedItem="{Binding Selected}"
+                      svc:ElasticColumns.Enabled="True" svc:ElasticColumns.StarWeights="2,1,2,2,1,1,1"
+                      MinHeight="150" MouseDoubleClick="Rows_MouseDoubleClick"
+                      Visibility="{Binding HasRecords, Converter={StaticResource BoolToVisibilityConverter}}">
+            <DataGrid.Columns>
+                <!-- R12.2 弹性列：全比例星列 + 最小可读宽（表格最小需求=ΣMin≈490） -->
+                <DataGridTextColumn Header="{markup:Loc hist.id}" Width="1.4*" MinWidth="82"
+                                    Binding="{Binding Id}" ElementStyle="{StaticResource TrimmedCell}" />
+                <DataGridTextColumn Header="{markup:Loc common.status}" Width="0.8*" MinWidth="48"
+                                    Binding="{Binding Status}" ElementStyle="{StaticResource TrimmedCell}" />
+
+                <DataGridTemplateColumn Header="{markup:Loc hist.source}" Width="2*" MinWidth="86">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource TinyButton}"
+                                        Content="{markup:Loc common.open}" Margin="6,0,0,0"
+                                        ToolTip="{markup:Loc common.openFolder}"
+                                        Command="{Binding DataContext.OpenPathCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding SourcePath}" />
+                                <Button Style="{StaticResource PathLinkButton}"
+                                        Content="{Binding SourcePath}"
+                                        ToolTip="{markup:Loc common.clickToCopy}"
+                                        Command="{Binding DataContext.CopyPathCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding SourcePath}" />
+                            </DockPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Header="{markup:Loc hist.target}" Width="2*" MinWidth="86">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource TinyButton}"
+                                        Content="{markup:Loc common.open}" Margin="6,0,0,0"
+                                        ToolTip="{markup:Loc common.openFolder}"
+                                        Command="{Binding DataContext.OpenPathCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding TargetPath}" />
+                                <Button Style="{StaticResource PathLinkButton}"
+                                        Content="{Binding TargetPath}"
+                                        ToolTip="{markup:Loc common.clickToCopy}"
+                                        Command="{Binding DataContext.CopyPathCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding TargetPath}" />
+                            </DockPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTextColumn Header="{markup:Loc hist.health}" Width="1*" MinWidth="64"
+                                    Binding="{Binding HealthText}" ElementStyle="{StaticResource TrimmedCell}" />
+                <DataGridTextColumn Header="{markup:Loc common.size}" Width="0.8*" MinWidth="48"
+                                    Binding="{Binding SizeText}" ElementStyle="{StaticResource TrimmedCell}" />
+                <DataGridTextColumn Header="{markup:Loc hist.started}" Width="1.2*" MinWidth="76"
+                                    Binding="{Binding StartedText}" ElementStyle="{StaticResource TrimmedCell}" />
+            </DataGrid.Columns>
+            </DataGrid>
+
+            <!-- 空状态：尚无记录时的提示（与表格互斥显示） -->
+            <TextBlock Style="{StaticResource Hint}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                       Text="{markup:Loc hist.hintEmpty}"
+                       Visibility="{Binding HasRecords, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=invert}" />
+        </Grid>
+
+        <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,10,0,0">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Button Style="{StaticResource PrimaryButton}" Content="{markup:Loc hist.restore}"
+                            Command="{Binding RestoreCommand}" CommandParameter="{Binding Selected}" Margin="0,0,6,0" />
+                    <Button Content="{markup:Loc hist.relink}"
+                            Command="{Binding RelinkCommand}" CommandParameter="{Binding Selected}" Margin="0,0,6,0"
+                            ToolTip="{markup:Loc hist.relinkConfirm}" />
+                    <Button Content="{markup:Loc common.openSource}" Command="{Binding OpenSourceCommand}" Margin="0,0,6,0" />
+                    <Button Content="{markup:Loc common.openTarget}" Command="{Binding OpenTargetCommand}" Margin="0,0,6,0" />
+                    <Button Content="{markup:Loc common.copyPath}" Command="{Binding CopyPathCommand}" />
+                </StackPanel>
+                <TextBlock Style="{StaticResource Hint}" Text="{markup:Loc hist.recordFile}" Margin="0,8,0,0" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

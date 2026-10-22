@@ -1,0 +1,8 @@
+﻿=== DirPorter R4 提权校验 ===
+用户: YU\31125    Elevated: False
+
+当前不是管理员，无法执行任何一项校验。
+请用管理员身份重新运行：
+    开始菜单 → 搜索 PowerShell → 右键 → 以管理员身份运行
+    cd 'C:\Users\31125\WorkBuddy\工具下载使用\DirPorter'
+    .\tests\run-elevated-checks.ps1

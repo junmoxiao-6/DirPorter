@@ -1,0 +1,41 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 浅色主题：深色文字 + 浅色面板（与 IDE 浅色主题一致） -->
+
+    <SolidColorBrush x:Key="WindowBg" Color="#F5F6F8" />
+    <SolidColorBrush x:Key="PanelBg" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="CardBg" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="CardBorder" Color="#E2E5EA" />
+    <SolidColorBrush x:Key="SelectionBg" Color="#E3ECFC" />
+    <SolidColorBrush x:Key="DangerSolidBg" Color="#C9372C" />
+    <SolidColorBrush x:Key="DangerSolidFg" Color="#FFFFFF" />
+
+    <SolidColorBrush x:Key="ListRowAlt" Color="#FAFBFC" />
+    <SolidColorBrush x:Key="WarnBannerBg" Color="#FFF7E6" />
+
+    <SolidColorBrush x:Key="TextPrimary" Color="#1B1F23" />
+    <SolidColorBrush x:Key="TextSecondary" Color="#4A535C" />
+    <SolidColorBrush x:Key="TextMuted" Color="#7A848E" />
+
+    <SolidColorBrush x:Key="AccentBg" Color="#2F6FED" />
+    <SolidColorBrush x:Key="AccentFg" Color="#FFFFFF" />
+
+    <SolidColorBrush x:Key="ControlBg" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="ControlBorder" Color="#CBD2DA" />
+    <SolidColorBrush x:Key="ControlBgHover" Color="#F2F6FE" />
+
+    <SolidColorBrush x:Key="DangerBg" Color="#FDE7E7" />
+    <SolidColorBrush x:Key="DangerFg" Color="#B42318" />
+    <SolidColorBrush x:Key="WarnFg" Color="#9A6700" />
+    <SolidColorBrush x:Key="OkFg" Color="#1B7F4B" />
+
+    <SolidColorBrush x:Key="ProgressTrack" Color="#E6E9EE" />
+    <SolidColorBrush x:Key="ProgressFill" Color="#2F6FED" />
+
+    <SolidColorBrush x:Key="NavBg" Color="#F0F2F5" />
+    <SolidColorBrush x:Key="NavFg" Color="#3C444C" />
+    <SolidColorBrush x:Key="NavActiveBg" Color="#DCE7FB" />
+    <SolidColorBrush x:Key="NavActiveFg" Color="#17409B" />
+
+</ResourceDictionary>

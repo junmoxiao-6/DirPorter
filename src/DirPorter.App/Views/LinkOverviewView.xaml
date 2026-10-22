@@ -1,0 +1,117 @@
+<UserControl x:Class="DirPorter.App.Views.LinkOverviewView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:markup="clr-namespace:DirPorter.App.Markup"
+             xmlns:svc="clr-namespace:DirPorter.App.Services">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Style="{StaticResource PageTitle}" Text="{markup:Loc lov.title}" />
+
+        <!-- 扫描范围 -->
+        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,10">
+            <StackPanel>
+                <DockPanel>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="{markup:Loc lov.roots}" />
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <CheckBox Content="{markup:Loc lov.includeHardLinks}" IsChecked="{Binding IncludeHardLinks}"
+                                  VerticalAlignment="Center" Margin="0,0,10,0"
+                                  ToolTip="{markup:Loc lov.includeHardLinksHint}" />
+                        <Button Style="{StaticResource PrimaryButton}" Content="{markup:Loc lov.scan}"
+                                Command="{Binding ScanCommand}" IsEnabled="{Binding CanScan}" Margin="0,0,6,0" />
+                        <Button Content="{markup:Loc lov.addRoot}" Command="{Binding AddRootCommand}" />
+                    </StackPanel>
+                </DockPanel>
+
+                <TextBlock Style="{StaticResource Hint}" Text="{markup:Loc lov.hint}"
+                           TextWrapping="Wrap" MaxWidth="560" Margin="0,2,0,6" />
+
+                <ItemsControl ItemsSource="{Binding Roots}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="{DynamicResource CardBorder}" BorderThickness="1"
+                                    CornerRadius="3" Padding="6,2" Margin="0,0,6,6">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" MaxWidth="320"
+                                               VerticalAlignment="Center" ToolTip="{Binding}" />
+                                    <Button Style="{StaticResource TinyButton}" Content="×" Margin="6,0,0,0"
+                                            Command="{Binding DataContext.RemoveRootCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <!-- 结果表 -->
+        <DockPanel Grid.Row="2">
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                <TextBlock Style="{StaticResource SectionTitle}" Text="{markup:Loc lov.results}" />
+                <TextBlock DockPanel.Dock="Right" Style="{StaticResource Hint}" Text="{Binding Status}"
+                           VerticalAlignment="Center" HorizontalAlignment="Right" />
+            </DockPanel>
+
+            <Grid>
+                <DataGrid ItemsSource="{Binding Links}" MinHeight="160"
+                          svc:ElasticColumns.Enabled="True" svc:ElasticColumns.StarWeights="3,1,3,1,1"
+                          IsReadOnly="True" SelectionMode="Single">
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Header="{markup:Loc lov.linkPath}" Width="3*" MinWidth="140">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right" Style="{StaticResource TinyButton}"
+                                                Content="{markup:Loc common.open}" Margin="6,0,0,0"
+                                                ToolTip="{markup:Loc common.openFolder}"
+                                                Command="{Binding DataContext.OpenLinkCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                        <Button Style="{StaticResource PathLinkButton}" Content="{Binding LinkPath}"
+                                                ToolTip="{markup:Loc common.clickToCopy}"
+                                                Command="{Binding DataContext.CopyPathCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding LinkPath}" />
+                                    </DockPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTextColumn Header="{markup:Loc lov.kind}" Width="1.4*" MinWidth="90"
+                                            Binding="{Binding KindText}" ElementStyle="{StaticResource TrimmedCell}" />
+                        <DataGridTextColumn Header="{markup:Loc lov.target}" Width="3*" MinWidth="120"
+                                            Binding="{Binding TargetPath}" ElementStyle="{StaticResource TrimmedCell}" />
+                        <DataGridTextColumn Header="{markup:Loc lov.state}" Width="1*" MinWidth="70"
+                                            Binding="{Binding HealthText}" ElementStyle="{StaticResource TrimmedCell}" />
+                        <DataGridTemplateColumn Header="{markup:Loc common.actions}" Width="1.4*" MinWidth="96">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource TinyButton}" Content="{markup:Loc lov.restore}"
+                                            ToolTip="{markup:Loc lov.restoreHint}"
+                                            Command="{Binding DataContext.RestoreLinkCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <TextBlock Style="{StaticResource Hint}" Text="{markup:Loc lov.empty}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                           Visibility="{Binding HasLinks, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=invert}" />
+            </Grid>
+        </DockPanel>
+
+        <TextBlock Grid.Row="3" Style="{StaticResource Hint}" Text="{markup:Loc lov.restoreNote}"
+                   TextWrapping="Wrap" MaxWidth="560" Margin="0,8,0,0" />
+    </Grid>
+</UserControl>

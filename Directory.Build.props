@@ -1,0 +1,22 @@
+<Project>
+
+  <!--
+    DirPorter 全局构建属性。
+    说明：TFM 集中在此处（依 D2：先 net8.0，受阻即切 net9.0，只改这一处）。
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <Version>0.2.1</Version>
+    <Product>DirPorter</Product>
+    <Company>DirPorter</Company>
+    <NeutralLanguage>zh-CN</NeutralLanguage>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
+</Project>

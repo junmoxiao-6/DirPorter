@@ -1,0 +1,101 @@
+<UserControl x:Class="DirPorter.App.Views.QuickMigrateView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:markup="clr-namespace:DirPorter.App.Markup">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Style="{StaticResource PageTitle}" Text="{markup:Loc quick.title}" />
+
+        <!-- ============ 源目录（可多个） ============ -->
+        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,10">
+            <StackPanel>
+                <TextBlock Style="{StaticResource SectionTitle}" Text="{markup:Loc quick.sources}" />
+
+                <ListBox ItemsSource="{Binding Sources}" Height="110" Margin="0,0,0,6"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource TinyButton}"
+                                        Content="{markup:Loc common.remove}" Margin="6,0,0,0"
+                                        Command="{Binding DataContext.RemoveSourceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}" />
+                                <TextBlock Text="{Binding Path}" TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center" />
+                            </DockPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}"
+                            Content="{markup:Loc scan.clearRoots}" Margin="6,0,0,0"
+                            Command="{Binding ClearSourcesCommand}" />
+                    <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}"
+                            Content="{markup:Loc quick.addSource}" Margin="6,0,0,0"
+                            Command="{Binding BrowseSourceCommand}" />
+                    <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}"
+                            Content="{markup:Loc quick.add}" Margin="6,0,0,0"
+                            Command="{Binding AddSourceTextCommand}" />
+                    <TextBox Text="{Binding NewSourcePath, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="{markup:Loc quick.sourceHint}" />
+                </DockPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- ============ 目标与选项 ============ -->
+        <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,0,0,10">
+            <StackPanel>
+                <TextBlock Style="{StaticResource SectionTitle}" Text="{markup:Loc mig.targetRoot}" />
+                <DockPanel Margin="0,0,0,10">
+                    <Button DockPanel.Dock="Right" Margin="6,0,0,0" Content="{markup:Loc common.browse}"
+                            Command="{Binding BrowseTargetRootCommand}" />
+                    <TextBox MinWidth="280"
+                             Text="{Binding TargetRoot, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="{markup:Loc mig.targetHint}" />
+                </DockPanel>
+
+                <TextBlock Style="{StaticResource SectionTitle}" Text="{markup:Loc mig.linkKind}" />
+                <ListBox Style="{StaticResource SegmentedControl}" Margin="0,4,0,4"
+                         ItemsSource="{Binding LinkKindOptions}"
+                         SelectedItem="{Binding SelectedLinkKind}"
+                         DisplayMemberPath="Display"
+                         ToolTip="{Binding SelectedLinkKind.Hint}">
+                    <ListBox.ItemContainerStyle>
+                        <!-- 文件级两种置灰：目标必须是文件，不能用于目录迁移（悬停看原因） -->
+                        <Style TargetType="ListBoxItem" BasedOn="{StaticResource SegmentedItem}">
+                            <Setter Property="IsEnabled" Value="{Binding CanUseForMigration}" />
+                            <Setter Property="ToolTip" Value="{Binding DisabledHint}" />
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                </ListBox>
+                <TextBlock Style="{StaticResource Hint}" Text="{markup:Loc mig.linkKind.scopeHint}"
+                           TextWrapping="Wrap" MaxWidth="560" Margin="0,0,0,8" />
+
+                <CheckBox Content="{markup:Loc mig.acknowledge}" IsChecked="{Binding AcknowledgeWarnings}"
+                          Margin="0,0,0,6" />
+                <!-- R12.4：占用源目录时可选结束占用进程（与迁移页同能力，避免"一键就只能失败"） -->
+                <CheckBox Content="{markup:Loc mig.killLocking}" IsChecked="{Binding KillLockingProcesses}"
+                          ToolTip="{markup:Loc mig.killLockingHint}" />
+            </StackPanel>
+        </Border>
+
+        <!-- ============ 执行与结果 ============ -->
+        <Border Grid.Row="3" Style="{StaticResource Card}" VerticalAlignment="Top">
+            <StackPanel>
+                <Button Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left"
+                        Content="{markup:Loc scan.oneClick}" MinHeight="34" MinWidth="180"
+                        Command="{Binding MigrateNowCommand}" IsEnabled="{Binding CanRun}"
+                        ToolTip="{markup:Loc quick.runHint}" />
+                <TextBlock Style="{StaticResource StatusText}" Text="{Binding Status}" Margin="0,10,0,0"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

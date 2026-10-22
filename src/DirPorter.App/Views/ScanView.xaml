@@ -1,0 +1,179 @@
+<UserControl x:Class="DirPorter.App.Views.ScanView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:markup="clr-namespace:DirPorter.App.Markup"
+             xmlns:svc="clr-namespace:DirPorter.App.Services">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Style="{StaticResource PageTitle}" Text="{markup:Loc scan.title}" />
+
+        <!-- ============ 根目录 + 预设 + 扫描控制 ============ -->
+        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="3*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="2*" />
+                </Grid.ColumnDefinitions>
+
+                <DockPanel Grid.Column="0" Margin="0,0,14,0">
+                    <TextBlock DockPanel.Dock="Top" Style="{StaticResource SectionTitle}" Text="{markup:Loc scan.roots}" />
+
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,6,0,0">
+                        <Button Style="{StaticResource GhostButton}" Content="{markup:Loc common.browse}"
+                                Command="{Binding BrowseRootCommand}" Margin="0,0,6,0" />
+                        <Button Style="{StaticResource GhostButton}" Content="{markup:Loc common.remove}"
+                                Command="{Binding RemoveRootCommand}" Margin="0,0,6,0" />
+                        <Button Style="{StaticResource GhostButton}" Content="{markup:Loc scan.clearRoots}"
+                                Command="{Binding ClearRootsCommand}" />
+                    </StackPanel>
+
+                    <ListBox ItemsSource="{Binding Roots}"
+                             SelectedItem="{Binding SelectedRoot}"
+                             DisplayMemberPath="Path"
+                             Height="96"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+                </DockPanel>
+
+                <StackPanel Grid.Column="1" Margin="0,0,14,0" VerticalAlignment="Top">
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="{markup:Loc scan.presets}" />
+                    <ItemsControl ItemsSource="{Binding Presets}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Style="{StaticResource GhostButton}"
+                                        HorizontalContentAlignment="Left"
+                                        Margin="0,1"
+                                        Content="{Binding Display}"
+                                        Command="{Binding DataContext.AddPresetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" VerticalAlignment="Top">
+                    <UniformGrid Columns="2" Margin="0,0,0,6">
+                        <TextBlock Style="{StaticResource Label}" Text="{markup:Loc scan.minSize}" Margin="0,0,8,0" />
+                        <TextBox Text="{Binding MinSizeText, UpdateSourceTrigger=PropertyChanged}" />
+                    </UniformGrid>
+
+                    <UniformGrid Columns="2" Margin="0,0,0,8">
+                        <TextBlock Style="{StaticResource Label}" Text="{markup:Loc common.search}" Margin="0,0,8,0" />
+                        <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+                    </UniformGrid>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button Style="{StaticResource PrimaryButton}" Content="{markup:Loc scan.start}"
+                                Command="{Binding ScanCommand}" IsEnabled="{Binding CanScan}" Margin="0,0,6,0"
+                                ToolTip="{markup:Loc scan.startHint}" />
+                        <Button Content="{markup:Loc common.cancel}" Command="{Binding CancelScanCommand}" />
+                    </StackPanel>
+
+                    <ProgressBar Value="{Binding Progress}" Maximum="100" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ============ 结果 ============ -->
+        <DockPanel Grid.Row="2">
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                <TextBlock Style="{StaticResource SectionTitle}" Text="{markup:Loc scan.results}" />
+                <!-- R12.1：全选/清除选择归位到结果区（它们作用于结果表）；按钮移出扫描控制区后
+                     控制区期望从 ~380 收敛到 ~230，窄窗不再被按钮排撑宽。 -->
+                <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}"
+                        Content="{markup:Loc scan.addToQueue}" Margin="12,0,0,0"
+                        Command="{Binding AddToQueueCommand}"
+                        ToolTip="{markup:Loc scan.addToQueueHint}" />
+                <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Margin="6,0,0,0"
+                        Content="{markup:Loc scan.clearSelection}" Command="{Binding ClearSelectionCommand}" />
+                <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}"
+                        Content="{markup:Loc scan.selectAll}" Command="{Binding SelectAllCommand}" />
+            </DockPanel>
+
+            <Grid>
+                <DataGrid ItemsSource="{Binding Results}" MinHeight="150" MouseDoubleClick="Rows_MouseDoubleClick"
+                          svc:ElasticColumns.Enabled="True" svc:ElasticColumns.StarWeights="0,4,1,1,1,2,1"
+                          Visibility="{Binding HasResults, Converter={StaticResource BoolToVisibilityConverter}}">
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="✓" Width="30" MinWidth="30">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
+                                          HorizontalAlignment="Center" Margin="0" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- R12.2 弹性列：全比例星列 + 最小可读宽（表格最小需求=ΣMin≈440，正常窗口永不出现横向滚动） -->
+                    <DataGridTemplateColumn Header="{markup:Loc common.path}" Width="3.2*" MinWidth="130">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource TinyButton}"
+                                            Content="{markup:Loc common.open}" Margin="6,0,0,0"
+                                            ToolTip="{markup:Loc common.openFolder}"
+                                            Command="{Binding DataContext.OpenPathCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding Path}" />
+                                    <Button Style="{StaticResource PathLinkButton}"
+                                            Content="{Binding Path}"
+                                            ToolTip="{markup:Loc common.clickToCopy}"
+                                            Command="{Binding DataContext.CopyPathCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding Path}" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTextColumn Header="{markup:Loc common.size}" Width="1*" MinWidth="52"
+                                        Binding="{Binding SizeText}" ElementStyle="{StaticResource TrimmedCell}" />
+                    <DataGridTextColumn Header="{markup:Loc common.files}" Width="0.8*" MinWidth="44"
+                                        Binding="{Binding FileCount}" ElementStyle="{StaticResource TrimmedCell}" />
+                    <DataGridTextColumn Header="{markup:Loc scan.migrated}" Width="0.8*" MinWidth="44"
+                                        Binding="{Binding MigratedText}" ElementStyle="{StaticResource TrimmedCell}" />
+                    <DataGridTemplateColumn Header="{markup:Loc scan.risk}" Width="1.6*" MinWidth="68">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <!-- 风险文本可能很长：裁剪 + 悬停看全文，绝不做"硬截断"（看不出被截了才最误导） -->
+                                <TextBlock Text="{Binding RiskText}"
+                                           TextTrimming="CharacterEllipsis"
+                                           TextWrapping="NoWrap"
+                                           ToolTip="{Binding RiskText}"
+                                           VerticalAlignment="Center" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTemplateColumn Header="{markup:Loc common.actions}" Width="1.4*" MinWidth="74">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Button Style="{StaticResource TinyButton}"
+                                        Content="{markup:Loc scan.enqueueRow}"
+                                        ToolTip="{markup:Loc scan.enqueueRowHint}"
+                                        Command="{Binding DataContext.EnqueueRowCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- 空状态：尚无扫描结果时的引导（与表格互斥显示） -->
+                <TextBlock Style="{StaticResource Hint}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                           Text="{markup:Loc scan.emptyState}"
+                           Visibility="{Binding HasResults, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=invert}" />
+            </Grid>
+        </DockPanel>
+
+        <!-- ============ 状态 ============ -->
+        <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,10,0,0" Padding="10,8">
+            <TextBlock Style="{StaticResource StatusText}" Text="{Binding Status}" />
+        </Border>
+    </Grid>
+</UserControl>

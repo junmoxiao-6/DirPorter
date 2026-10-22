@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>DirPorter.Tests</RootNamespace>
+    <AssemblyName>DirPorter.Tests</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DirPorter.Core\DirPorter.Core.csproj" />
+    <!-- R7：WPF 宿主（界面契约测试：本地化键、资源键、XAML 实例化） -->
+    <ProjectReference Include="..\DirPorter.App\DirPorter.App.csproj" />
+  </ItemGroup>
+
+</Project>

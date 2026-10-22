@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>DirPorter.UiProbe</RootNamespace>
+    <AssemblyName>dirporter-uiprobe</AssemblyName>
+    <StartupObject>DirPorter.UiProbe.Program</StartupObject>
+    <Description>开发期 UI 探针：把五个页面离屏渲染成 PNG 并输出布局度量，用于定位"内容不显示/被压扁"这类肉眼难判的布局缺陷。</Description>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DirPorter.App\DirPorter.App.csproj" />
+  </ItemGroup>
+
+</Project>

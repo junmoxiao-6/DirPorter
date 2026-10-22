@@ -1,0 +1,29 @@
+# ---- 构建产物 ----
+bin/
+obj/
+dist/
+publish/
+*.user
+*.suo
+.vs/
+TestResults/
+
+# ---- 发布/本地数据 ----
+logs/
+*.log
+*.trx
+data/
+
+# ---- 工具产物 ----
+tools/**/bin/
+tools/**/obj/
+installer/output/
+
+# ---- Python ----
+__pycache__/
+*.pyc
+
+# ---- 系统 ----
+Thumbs.db
+desktop.ini
+.DS_Store

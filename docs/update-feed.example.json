@@ -1,0 +1,6 @@
+{
+  "version": "0.1.9",
+  "url": "https://example.com/dirporter/0.1.9/dirporter.exe",
+  "sha256": "4359fab3fc6a2223b4fdc6fdc7c7023d12b6c553ad72f93f40ddc754de390365",
+  "notes": "列边界可拖拽：拖动分隔线时相邻两列此消彼长，总宽不变；迁移默认剪切（不保留备份副本）；设置页新增检查更新。"
+}

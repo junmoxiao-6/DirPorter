@@ -1,0 +1,263 @@
+<UserControl x:Class="DirPorter.App.Views.MigrateView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:markup="clr-namespace:DirPorter.App.Markup"
+             xmlns:svc="clr-namespace:DirPorter.App.Services">
+    <!--
+        布局要点（这里踩过坑，改动前请先读）：
+        本页有 4 个"内容由内容决定高度"的区域（Auto 行）围着 1 个队列区（* 行）。
+        之前选项区写得太高（4 个复选框各占一行、数字框各占一行），
+        再加上预览区默认展开（Textbox 固定 170px），Auto 行合计约 640px，
+        在 780px 窗口里把 * 行挤到只剩 ~45px —— 队列只看得见表头、看不到任何一行
+        （用户实测反馈的「迁移队列无法正常展示」）。
+        现在的预算：Auto 行合计约 483px（选项区压成两列 + 数字框并排 + 预览默认折叠；
+        建链类型选择器与提示约占 58px），* 行稳定拿到 ~230px；再给 DataGrid 一个
+        MinHeight 兜底，任何窗口尺寸下都不会"消失"。
+    -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Style="{StaticResource PageTitle}" Text="{markup:Loc mig.title}" />
+
+        <!-- ============ 目标根 + 选项（紧凑） ============ -->
+        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="3*" />
+                    <ColumnDefinition Width="2*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- R12.4：迁移页 = 纯迁移（只搬数据，不建链）。建链类型与建链动作由
+                     「一键迁移建链」页承担；迁移完成后可一键前往「链接」页建链。 -->
+                <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,10">
+                    <TextBlock Style="{StaticResource Hint}" Text="{markup:Loc mig.pureHint}"
+                               TextWrapping="Wrap" MaxWidth="560" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,16,0">
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="{markup:Loc mig.targetRoot}" />
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Margin="6,0,0,0"
+                                Content="{markup:Loc common.browse}"
+                                Command="{Binding BrowseTargetRootCommand}" />
+                        <TextBox Text="{Binding TargetRoot, UpdateSourceTrigger=PropertyChanged}" />
+                    </DockPanel>
+                    <TextBlock Style="{StaticResource Hint}" Text="{markup:Loc mig.targetHint}" Margin="0,4,0,0" />
+
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="{markup:Loc mig.addManual}" Margin="0,10,0,4" />
+
+                    <Grid Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{StaticResource Label}" MinWidth="66"
+                                   Text="{markup:Loc mig.source}" Margin="0,0,8,0" />
+                        <TextBox Grid.Column="1" Text="{Binding ManualSource, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="{markup:Loc mig.sourceHint}" />
+                        <Button Grid.Column="2" Margin="6,0,0,0" Content="{markup:Loc common.browse}"
+                                Command="{Binding BrowseManualSourceCommand}" />
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{StaticResource Label}" MinWidth="66"
+                                   Text="{markup:Loc mig.target}" Margin="0,0,8,0" />
+                        <TextBox Grid.Column="1" Text="{Binding ManualTarget, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="{markup:Loc mig.targetHintShort}" />
+                        <Button Grid.Column="2" Style="{StaticResource PrimaryButton}" Margin="6,0,0,0"
+                                Content="{markup:Loc mig.addToQueue}" Command="{Binding AddManualCommand}" />
+                    </Grid>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Grid.Column="1">
+                    <!-- 复选框两列排布：从 4 行压到 2 行 -->
+                    <UniformGrid Columns="2" Margin="0,0,0,8">
+                        <CheckBox Content="{markup:Loc mig.keepBackup}" IsChecked="{Binding KeepBackup}" ToolTip="{markup:Loc mig.keepBackupHint}" />
+                        <CheckBox Content="{markup:Loc mig.continueOnFailure}" IsChecked="{Binding ContinueOnFailure}" />
+                        <CheckBox Content="{markup:Loc mig.restorePoint}" IsChecked="{Binding CreateRestorePoint}" />
+                        <CheckBox Content="{markup:Loc mig.killLocking}" IsChecked="{Binding KillLockingProcesses}" />
+                    </UniformGrid>
+
+                    <!-- 同卷快速移动：与资源管理器剪切同卷文件夹一致；可关掉换回"永远保留备份" -->
+                    <CheckBox Content="{markup:Loc mig.sameVolume}" IsChecked="{Binding SameVolumeMove}"
+                              ToolTip="{markup:Loc mig.sameVolumeHint}" />
+                    <TextBlock Style="{StaticResource Hint}" Text="{markup:Loc mig.sameVolumeHint}"
+                               MaxWidth="360" Margin="0,0,0,8" />
+
+                    <!-- 两个数字框并排：从 2 行压到 1 行 -->
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Left" Style="{StaticResource Label}"
+                                   Text="{markup:Loc mig.threads}" MinWidth="86" />
+                        <TextBox Width="52" Margin="0,0,12,0"
+                                 Text="{Binding Threads, UpdateSourceTrigger=LostFocus}" />
+                        <TextBlock DockPanel.Dock="Left" Style="{StaticResource Label}"
+                                   Text="{markup:Loc mig.retention}" MinWidth="76" />
+                        <TextBox Width="52" Text="{Binding RetentionDays, UpdateSourceTrigger=LostFocus}" />
+                    </DockPanel>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ============ 队列 ============ -->
+        <DockPanel Grid.Row="2">
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                <TextBlock Style="{StaticResource SectionTitle}" Text="{markup:Loc mig.queue}" />
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <TextBlock Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,12,0"
+                               Text="{markup:Loc mig.queueHint}" />
+                    <Button Style="{StaticResource GhostButton}" Content="{markup:Loc common.remove}"
+                            ToolTip="{markup:Loc mig.removeSelectedHint}"
+                            Command="{Binding RemoveSelectedCommand}" Margin="0,0,6,0" />
+                    <Button Style="{StaticResource GhostButton}" Content="{markup:Loc mig.clearQueue}"
+                            ToolTip="{markup:Loc mig.clearQueueHint}"
+                            Command="{Binding ClearQueueCommand}" />
+                </StackPanel>
+            </DockPanel>
+
+            <DataGrid ItemsSource="{Binding Queue}"
+                      svc:ElasticColumns.Enabled="True" svc:ElasticColumns.StarWeights="0,1,3,3,1,1,1,1"
+                      MinHeight="150"
+                      MouseDoubleClick="Rows_MouseDoubleClick">
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="✓" Width="30" MinWidth="30">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
+                                          HorizontalAlignment="Center" Margin="0" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <!-- R12.2 弹性列：全比例星列 + 最小可读宽（表格最小需求=ΣMin≈424） -->
+                    <DataGridTextColumn Header="{markup:Loc hist.id}" Width="0.6*" MinWidth="42"
+                                        Binding="{Binding EntryId}" ElementStyle="{StaticResource TrimmedCell}" />
+
+                    <DataGridTemplateColumn Header="{markup:Loc mig.source}" Width="2.4*" MinWidth="100">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource TinyButton}"
+                                            Content="{markup:Loc common.open}" Margin="6,0,0,0"
+                                            ToolTip="{markup:Loc common.openFolder}"
+                                            Command="{Binding DataContext.OpenPathCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding SourcePath}" />
+                                    <Button Style="{StaticResource PathLinkButton}"
+                                            Content="{Binding SourcePath}"
+                                            ToolTip="{markup:Loc common.clickToCopy}"
+                                            Command="{Binding DataContext.CopyPathCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding SourcePath}" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTemplateColumn Header="{markup:Loc mig.target}" Width="2.4*" MinWidth="100">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource TinyButton}"
+                                            Content="{markup:Loc common.open}" Margin="6,0,0,0"
+                                            ToolTip="{markup:Loc common.openFolder}"
+                                            Command="{Binding DataContext.OpenPathCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding TargetPath}" />
+                                    <Button Style="{StaticResource PathLinkButton}"
+                                            Content="{Binding TargetPath}"
+                                            ToolTip="{markup:Loc common.clickToCopy}"
+                                            Command="{Binding DataContext.CopyPathCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding TargetPath}" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTextColumn Header="{markup:Loc common.type}" Width="1*" MinWidth="56"
+                                        Binding="{Binding LinkKindText}" ElementStyle="{StaticResource TrimmedCell}" />
+                    <DataGridTextColumn Header="{markup:Loc common.status}" Width="1*" MinWidth="56"
+                                        Binding="{Binding StateText}" ElementStyle="{StaticResource TrimmedCell}" />
+                    <DataGridTextColumn Header="%" Width="0.6*" MinWidth="40"
+                                        Binding="{Binding Percent, StringFormat={}{0:0.0}}" ElementStyle="{StaticResource TrimmedCell}" />
+
+                    <!-- R12.5：单条移除——不想迁移某一条时直接从队列删掉（不必清空整队） -->
+                    <DataGridTemplateColumn Header="{markup:Loc common.actions}" Width="0.9*" MinWidth="64">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Button Style="{StaticResource TinyButton}" Content="{markup:Loc mig.removeRow}"
+                                        Margin="0"
+                                        Command="{Binding DataContext.RemoveFromQueueCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="{markup:Loc mig.removeRowHint}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+        </DockPanel>
+
+        <!-- ============ 进度与控制 ============ -->
+        <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,10,0,0">
+            <StackPanel>
+                <DockPanel>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="{markup:Loc mig.progress}" />
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <TextBlock Style="{StaticResource Hint}" Text="{Binding SpeedText}" Margin="0,0,14,0" />
+                        <TextBlock Style="{StaticResource Hint}" Text="{Binding EtaText}" />
+                    </StackPanel>
+                </DockPanel>
+
+                <ProgressBar Value="{Binding OverallPercent}" Maximum="100" Margin="0,2,0,8" />
+
+                <!-- R12.1：按钮排与确认复选拆成两行——同排并排时"按钮 531 + 复选 230"把页面期望
+                     撑到 ~760，窄窗下白白制造横向滚动。 -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                    <Button Style="{StaticResource PrimaryButton}" Content="{markup:Loc mig.run}"
+                            Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}" Margin="0,0,6,0" />
+                    <Button Content="{markup:Loc mig.pause}" Command="{Binding PauseCommand}"
+                            IsEnabled="{Binding CanPause}" Margin="0,0,6,0" />
+                    <Button Content="{markup:Loc mig.resume}" Command="{Binding ResumeCommand}"
+                            IsEnabled="{Binding CanResume}" Margin="0,0,6,0" />
+                    <Button Content="{markup:Loc mig.dryRun}" Command="{Binding PreviewCommand}"
+                            IsEnabled="{Binding CanStart}" Margin="0,0,6,0" />
+                    <Button Style="{StaticResource SolidDangerButton}" Content="{markup:Loc mig.cancel}"
+                            Command="{Binding CancelCommand}" IsEnabled="{Binding CanCancel}" />
+                </StackPanel>
+
+                <CheckBox Content="{markup:Loc mig.acknowledge}" IsChecked="{Binding AcknowledgeWarnings}" />
+
+                <TextBlock Style="{StaticResource StatusText}" Text="{Binding StatusText}" Margin="0,8,0,0" />
+
+                <!-- R12.4：纯迁移完成后 —— 保留"迁移完就建链"的动线，一键前往「链接」页并预填 -->
+                <Button Style="{StaticResource PrimaryButton}" Content="{markup:Loc mig.goLink}"
+                        Command="{Binding GoToLinkCommand}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                        Visibility="{Binding CanGoToLink, Converter={StaticResource BoolToVisibilityConverter}}"
+                        ToolTip="{markup:Loc mig.goLinkHint}" />
+            </StackPanel>
+        </Border>
+
+        <!-- ============ 预览（默认折叠，避免挤压队列区） ============ -->
+        <Expander Grid.Row="4" Header="{markup:Loc mig.preview}" Margin="0,10,0,0" IsExpanded="False">
+            <TextBox Text="{Binding PreviewText, Mode=OneWay}"
+                     AcceptsReturn="True"
+                     IsReadOnly="True"
+                     VerticalScrollBarVisibility="Auto"
+                     HorizontalScrollBarVisibility="Auto"
+                     FontFamily="Consolas, Cascadia Mono"
+                     Height="150"
+                     Margin="0,6,0,0" />
+        </Expander>
+    </Grid>
+</UserControl>

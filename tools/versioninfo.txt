@@ -1,0 +1,3 @@
+﻿FileVersion: 0.1.4.0
+ProductVersion: 0.1.4
+FileDescription: DirPorter 目录搬运工具

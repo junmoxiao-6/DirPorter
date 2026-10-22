@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>DirPorter.Core</RootNamespace>
+    <AssemblyName>DirPorter.Core</AssemblyName>
+    <Description>DirPorter 核心：链接提供器、文件系统、预检、迁移状态机、扫描。</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 单元测试需要验证 FSCTL 常量、重解析点编解码等内部实现细节 -->
+    <InternalsVisibleTo Include="DirPorter.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 台账 checksum（xxHash3，需求指定）与 >1000 条时的 SQLite 模式所需的官方 MIT 依赖 -->
+    <PackageReference Include="System.IO.Hashing" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.10" />
+  </ItemGroup>
+
+</Project>

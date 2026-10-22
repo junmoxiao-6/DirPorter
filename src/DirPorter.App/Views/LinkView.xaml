@@ -1,0 +1,181 @@
+<UserControl x:Class="DirPorter.App.Views.LinkView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:markup="clr-namespace:DirPorter.App.Markup"
+             xmlns:svc="clr-namespace:DirPorter.App.Services">
+    <!--
+        布局要点：能力矩阵原来每个类型占 3 行（名称 / 原因 / 建议），5 个类型就有 ~215px，
+        把下面的「已存在的链接」表挤到只剩百来像素。现在压成"一行一类型"（名称 + 状态 + 原因同行），
+        明细发给 ToolTip，表格区因此稳定拿到足够高度。
+    -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Style="{StaticResource PageTitle}" Text="{markup:Loc link.title}" />
+
+        <!-- ============ 输入 ============ -->
+        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="{markup:Loc link.linkPath}" />
+                    <DockPanel Margin="0,0,0,8">
+                        <Button DockPanel.Dock="Right" Margin="6,0,0,0" Content="{markup:Loc common.browse}"
+                                Command="{Binding BrowseLinkPathCommand}" />
+                        <TextBox Text="{Binding LinkPath, UpdateSourceTrigger=PropertyChanged}" />
+                    </DockPanel>
+
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="{markup:Loc link.targetPath}" />
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Margin="6,0,0,0" Content="{markup:Loc common.browseFile}"
+                                ToolTip="{markup:Loc link.browseFileHint}"
+                                Command="{Binding BrowseTargetFileCommand}" />
+                        <Button DockPanel.Dock="Right" Margin="6,0,0,0" Content="{markup:Loc common.browse}"
+                                Command="{Binding BrowseTargetPathCommand}" />
+                        <TextBox Text="{Binding TargetPath, UpdateSourceTrigger=PropertyChanged}" />
+                    </DockPanel>
+
+                    <TextBlock Style="{StaticResource Hint}" Text="{markup:Loc link.hint}" Margin="0,6,0,0" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" MinWidth="250">
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="{markup:Loc link.type}" />
+                    <ComboBox ItemsSource="{Binding Options}" SelectedItem="{Binding SelectedOption}"
+                              DisplayMemberPath="Name" Margin="0,0,0,6" />
+
+                    <CheckBox Content="{markup:Loc link.relative}" IsChecked="{Binding UseRelative}" Margin="0,0,0,8" />
+
+                    <StackPanel Orientation="Horizontal">
+                        <Button Style="{StaticResource PrimaryButton}" Content="{markup:Loc link.create}"
+                                Command="{Binding CreateCommand}" Margin="0,0,6,0" />
+                        <Button Content="{markup:Loc link.dryRunCreate}" Command="{Binding DryRunCreateCommand}" />
+                    </StackPanel>
+
+                    <TextBlock Style="{StaticResource Hint}" Text="{Binding RecommendText}"
+                               TextWrapping="Wrap" MaxWidth="420" Margin="0,8,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ============ 能力矩阵 + 检视 ============ -->
+        <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Margin="0,0,14,0">
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="{markup:Loc link.capability}" />
+
+                    <ItemsControl ItemsSource="{Binding Options}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel Margin="0,1">
+                                    <TextBlock DockPanel.Dock="Right" MinWidth="60" TextAlignment="Right"
+                                               FontSize="{StaticResource FontSizeSmall}"
+                                               Text="{Binding CanHandle, Converter={StaticResource BoolToStateConverter}}" />
+                                    <TextBlock FontSize="{StaticResource FontSizeSmall}" Text="{Binding Name}"
+                                               Margin="0,0,8,0" />
+                                    <TextBlock FontSize="{StaticResource FontSizeSmall}"
+                                               Foreground="{DynamicResource TextMuted}"
+                                               TextTrimming="CharacterEllipsis"
+                                               MaxWidth="260"
+                                               Text="{Binding Reason}"
+                                               ToolTip="{Binding Suggestion}" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Style="{StaticResource Hint}" Text="{Binding PrivilegeText}"
+                               TextWrapping="Wrap" MaxWidth="420" Margin="0,8,0,0" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1">
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="{markup:Loc link.inspectPath}" />
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <Button Content="{markup:Loc link.inspect}" Command="{Binding InspectCommand}" Margin="0,0,6,0" />
+                        <Button Content="{markup:Loc link.unlink}" Command="{Binding UnlinkCommand}" />
+                    </StackPanel>
+
+                    <TextBox Text="{Binding ResultText, Mode=OneWay}" IsReadOnly="True"
+                             AcceptsReturn="True" TextWrapping="Wrap" Height="86"
+                             VerticalScrollBarVisibility="Auto" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ============ 已存在的链接 ============ -->
+        <DockPanel Grid.Row="3">
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                <TextBlock Style="{StaticResource SectionTitle}" Text="{markup:Loc link.existing}" />
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <TextBlock Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,12,0"
+                               Text="{markup:Loc common.doubleClickHint}" />
+                    <Button Style="{StaticResource GhostButton}"
+                            Content="{markup:Loc common.refresh}"
+                            Command="{Binding ReloadExistingLinksCommand}" />
+                </StackPanel>
+            </DockPanel>
+
+            <Grid>
+                <DataGrid ItemsSource="{Binding ExistingLinks}" MinHeight="120" MouseDoubleClick="Rows_MouseDoubleClick"
+                          svc:ElasticColumns.Enabled="True" svc:ElasticColumns.StarWeights="2,2,1,1,1"
+                          Visibility="{Binding HasExistingLinks, Converter={StaticResource BoolToVisibilityConverter}}">
+                <DataGrid.Columns>
+                    <!-- R12.2 弹性列：全比例星列 + 最小可读宽（表格最小需求=ΣMin≈398） -->
+                    <DataGridTemplateColumn Header="{markup:Loc link.linkPath}" Width="2*" MinWidth="110">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource TinyButton}"
+                                            Content="{markup:Loc common.open}" Margin="6,0,0,0"
+                                            ToolTip="{markup:Loc common.openFolder}"
+                                            Command="{Binding DataContext.OpenPathCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding LinkPath}" />
+                                    <Button Style="{StaticResource PathLinkButton}"
+                                            Content="{Binding LinkPath}"
+                                            ToolTip="{markup:Loc common.clickToCopy}"
+                                            Command="{Binding DataContext.CopyPathCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding LinkPath}" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="{markup:Loc link.targetPath}" Width="2*" MinWidth="110"
+                                        Binding="{Binding TargetPath}" ElementStyle="{StaticResource TrimmedCell}" />
+                    <DataGridTextColumn Header="{markup:Loc common.type}" Width="0.8*" MinWidth="54"
+                                        Binding="{Binding KindText}" ElementStyle="{StaticResource TrimmedCell}" />
+                    <DataGridTextColumn Header="{markup:Loc common.status}" Width="0.8*" MinWidth="54"
+                                        Binding="{Binding HealthText}" ElementStyle="{StaticResource TrimmedCell}" />
+                    <DataGridTemplateColumn Header="{markup:Loc common.actions}" Width="0.8*" MinWidth="70">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Button Style="{StaticResource DangerButton}" Content="{markup:Loc link.unlink}"
+                                        Command="{Binding DataContext.UnlinkRowCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- 空状态：尚无链接时的提示（与表格互斥显示） -->
+                <TextBlock Style="{StaticResource Hint}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                           Text="{markup:Loc link.emptyState}"
+                           Visibility="{Binding HasExistingLinks, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=invert}" />
+            </Grid>
+        </DockPanel>
+    </Grid>
+</UserControl>

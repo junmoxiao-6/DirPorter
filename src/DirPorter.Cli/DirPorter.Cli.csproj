@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>DirPorter.Cli</RootNamespace>
+    <!--
+      ⚠️ R7 起，正式单 exe 由 DirPorter.App 产出（AssemblyName=dirporter，含 GUI+CLI）。
+      本控制台宿主保留作为**开发期调试入口**，改名 dirporter-cli 以避免与单 exe 重名混淆。
+    -->
+    <AssemblyName>dirporter-cli</AssemblyName>
+    <Description>DirPorter 命令行调试宿主（正式单 exe 见 DirPorter.App）。</Description>
+
+    <!-- 应用清单：longPathAware + PerMonitorV2 DPI + 权限级别。
+         默认 asInvoker（按需提权）；管理员变体 app.admin.manifest 由 publish.ps1 -RequireAdmin 指定。 -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DirPorter.Core\DirPorter.Core.csproj" />
+  </ItemGroup>
+
+</Project>

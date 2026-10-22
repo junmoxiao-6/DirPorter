@@ -1,0 +1,177 @@
+﻿=== DirPorter UI 探针 ===
+渲染尺寸：1220 x 700（主窗口 1220x780 的内容区实测值）
+输出目录：tools/DirPorter.UiProbe/snapshots
+
+诊断：ShutdownMode=OnLastWindowClose, MainWindow=null
+--- 页面 scan 处理前：HasShutdownStarted=False ---
+!! [抓凶] Window 出现：DirPorter.App.MainWindow
+=== scan ===
+实际尺寸：1220 x 700
+关键元素实测尺寸：
+  ListBox                              601.3 x 96     
+  ScrollViewer                         597.3 x 92     
+  ItemsControl                         150.5 x 150    
+  TextBox                              205.1 x 29.1      ← 高度偏小，可能被压扁
+  ScrollViewer[PART_ContentHost]       203.1 x 27.1      ← 高度偏小，可能被压扁
+  TextBox                              205.1 x 29.1      ← 高度偏小，可能被压扁
+  ScrollViewer[PART_ContentHost]       203.1 x 27.1      ← 高度偏小，可能被压扁
+  ProgressBar                          410.2 x 10        ← 高度偏小，可能被压扁
+  DataGrid                              1220 x 368.9  
+    ── DataGrid 列宽（表格宽 1220）
+      [ 0] ✓                    声明=Fixed(30)    实际=      30 Min=30
+      [ 1] 路径                   声明=Star(3.2)    实际=     432 Min=130
+      [ 2] 大小                   声明=Star(1)      实际=     135 Min=52
+      [ 3] 文件数                  声明=Star(0.8)    实际=     108 Min=44
+      [ 4] 已迁移                  声明=Star(0.8)    实际=     108 Min=44
+      [ 5] 风险                   声明=Star(1.6)    实际=     216 Min=68
+      [ 6] 操作                   声明=Star(1.4)    实际=     189 Min=74
+  ScrollViewer[DG_ScrollViewer]         1218 x 366.9  
+  DataGridColumnHeadersPresenter[PART_ColumnHeadersPresenter]    1218 x 32        ← 高度偏小，可能被压扁
+  DataGridCellsPresenter                1218 x 32        ← 高度偏小，可能被压扁
+  DataGridCellsPresenter                1218 x 32        ← 高度偏小，可能被压扁
+  DataGridCellsPresenter                1218 x 32        ← 高度偏小，可能被压扁
+  DataGridCellsPresenter                1218 x 32        ← 高度偏小，可能被压扁
+  DataGridCellsPresenter                1218 x 32        ← 高度偏小，可能被压扁
+  DataGridCellsPresenter                1218 x 32        ← 高度偏小，可能被压扁
+
+  [OK] [scan] DataGrid 6 行 × 7 列：单元格均已渲染。
+
+--- 页面 quick 处理前：HasShutdownStarted=False ---
+=== quick ===
+实际尺寸：1220 x 700
+关键元素实测尺寸：
+  ListBox                               1190 x 110    
+  ScrollViewer                          1186 x 106    
+  TextBox                                993 x 29.1      ← 高度偏小，可能被压扁
+  ScrollViewer[PART_ContentHost]         991 x 27.1      ← 高度偏小，可能被压扁
+  TextBox                               1120 x 31.1      ← 高度偏小，可能被压扁
+  ScrollViewer[PART_ContentHost]        1118 x 29.1      ← 高度偏小，可能被压扁
+  ListBox                              453.8 x 31.1      ← 高度偏小，可能被压扁
+  ScrollViewer                         451.8 x 29.1      ← 高度偏小，可能被压扁
+
+
+--- 页面 migrate 处理前：HasShutdownStarted=False ---
+=== migrate ===
+实际尺寸：1220 x 700
+关键元素实测尺寸：
+  ListBox                              453.8 x 31.1      ← 高度偏小，可能被压扁
+  ScrollViewer                         451.8 x 29.1      ← 高度偏小，可能被压扁
+  TextBox                                628 x 31.1      ← 高度偏小，可能被压扁
+  ScrollViewer[PART_ContentHost]         626 x 29.1      ← 高度偏小，可能被压扁
+  TextBox                                554 x 31.1      ← 高度偏小，可能被压扁
+  ScrollViewer[PART_ContentHost]         552 x 29.1      ← 高度偏小，可能被压扁
+  TextBox                                540 x 30        ← 高度偏小，可能被压扁
+  ScrollViewer[PART_ContentHost]         538 x 28        ← 高度偏小，可能被压扁
+  TextBox                                 52 x 29.1      ← 高度偏小，可能被压扁
+  ScrollViewer[PART_ContentHost]          50 x 27.1      ← 高度偏小，可能被压扁
+  TextBox                                 52 x 29.1      ← 高度偏小，可能被压扁
+  ScrollViewer[PART_ContentHost]          50 x 27.1      ← 高度偏小，可能被压扁
+  DataGrid                              1220 x 150    
+    ── DataGrid 列宽（表格宽 1220）
+      [ 0] ✓                    声明=Fixed(30)    实际=      30 Min=30
+      [ 1] 编号                   声明=Star(0.6)    实际=    89.1 Min=42
+      [ 2] 源目录                  声明=Star(2.4)    实际=   356.4 Min=100
+      [ 3] 目标目录                 声明=Star(2.4)    实际=   356.4 Min=100
+      [ 4] 类型                   声明=Star(1)      实际=   148.5 Min=56
+      [ 5] 状态                   声明=Star(1)      实际=   148.5 Min=56
+      [ 6] %                    声明=Star(0.6)    实际=    89.1 Min=40
+  ScrollViewer[DG_ScrollViewer]         1218 x 148    
+  DataGridColumnHeadersPresenter[PART_ColumnHeadersPresenter]    1218 x 32        ← 高度偏小，可能被压扁
+  DataGridCellsPresenter                1218 x 32        ← 高度偏小，可能被压扁
+  DataGridCellsPresenter                1218 x 32        ← 高度偏小，可能被压扁
+  DataGridCellsPresenter                1218 x 32        ← 高度偏小，可能被压扁
+  ProgressBar                           1190 x 10        ← 高度偏小，可能被压扁
+  Expander                              1220 x 23        ← 高度偏小，可能被压扁
+
+  [OK] [migrate] DataGrid 3 行 × 7 列：单元格均已渲染。
+
+--- 页面 link 处理前：HasShutdownStarted=False ---
+=== link ===
+实际尺寸：1220 x 700
+关键元素实测尺寸：
+  TextBox                              694.8 x 31.1      ← 高度偏小，可能被压扁
+  ScrollViewer[PART_ContentHost]       692.8 x 29.1      ← 高度偏小，可能被压扁
+  TextBox                              611.3 x 31.1      ← 高度偏小，可能被压扁
+  ScrollViewer[PART_ContentHost]       609.3 x 29.1      ← 高度偏小，可能被压扁
+  ComboBox                             409.2 x 25.1      ← 高度偏小，可能被压扁
+  ItemsControl                           581 x 89.4   
+  TextBox                                595 x 86     
+  ScrollViewer[PART_ContentHost]         593 x 84     
+  ScrollViewer[DG_ScrollViewer]         1218 x 259.9  
+  DataGridColumnHeadersPresenter[PART_ColumnHeadersPresenter]    1218 x 32        ← 高度偏小，可能被压扁
+
+
+--- 页面 history 处理前：HasShutdownStarted=False ---
+=== history ===
+实际尺寸：1220 x 700
+关键元素实测尺寸：
+  DataGrid                              1220 x 526.4  
+    ── DataGrid 列宽（表格宽 1220）
+      [ 0] 编号                   声明=Star(1.4)    实际=   185.3 Min=82
+      [ 1] 状态                   声明=Star(0.8)    实际=   105.9 Min=48
+      [ 2] 源                    声明=Star(2)      实际=   264.8 Min=86
+      [ 3] 目标                   声明=Star(2)      实际=   264.8 Min=86
+      [ 4] 检查链接健康度              声明=Star(1)      实际=   132.4 Min=64
+      [ 5] 大小                   声明=Star(0.8)    实际=   105.9 Min=48
+      [ 6] 开始                   声明=Star(1.2)    实际=   158.9 Min=76
+  ScrollViewer[DG_ScrollViewer]         1218 x 524.4  
+  DataGridColumnHeadersPresenter[PART_ColumnHeadersPresenter]    1218 x 32        ← 高度偏小，可能被压扁
+  DataGridCellsPresenter                1218 x 32        ← 高度偏小，可能被压扁
+  DataGridCellsPresenter                1218 x 32        ← 高度偏小，可能被压扁
+  DataGridCellsPresenter                1218 x 32        ← 高度偏小，可能被压扁
+  DataGridCellsPresenter                1218 x 32        ← 高度偏小，可能被压扁
+
+  [OK] [history] DataGrid 4 行 × 7 列：单元格均已渲染。
+
+--- 页面 settings 处理前：HasShutdownStarted=False ---
+=== settings ===
+实际尺寸：1220 x 700
+关键元素实测尺寸：
+  ScrollViewer                          1220 x 662.6  
+  ComboBox                            1003.2 x 25.1      ← 高度偏小，可能被压扁
+  ComboBox                            1003.2 x 25.1      ← 高度偏小，可能被压扁
+  TextBox                             1003.2 x 29.1      ← 高度偏小，可能被压扁
+  ScrollViewer[PART_ContentHost]      1001.2 x 27.1      ← 高度偏小，可能被压扁
+  ComboBox                            1003.2 x 25.1      ← 高度偏小，可能被压扁
+  TextBox                             1003.2 x 29.1      ← 高度偏小，可能被压扁
+  ScrollViewer[PART_ContentHost]      1001.2 x 27.1      ← 高度偏小，可能被压扁
+  ItemsControl                        1173.2 x 96.2   
+
+
+!! [抓凶] Window 出现：DirPorter.App.MainWindow
+=== shell（完整主窗口）===
+实际尺寸：1280 x 820
+=== shell ===
+实际尺寸：1280 x 820
+关键元素实测尺寸：
+  ListBox                              196.8 x 705.6  
+  ScrollViewer                         195.2 x 704    
+  ScrollViewer                          1056 x 702.4  
+  ListBox                              994.4 x 110.4  
+  ScrollViewer                         990.4 x 107.2  
+  TextBox                              797.6 x 29.6      ← 高度偏小，可能被压扁
+  ScrollViewer[PART_ContentHost]         796 x 28        ← 高度偏小，可能被压扁
+  TextBox                                924 x 32        ← 高度偏小，可能被压扁
+  ScrollViewer[PART_ContentHost]       922.4 x 30.4      ← 高度偏小，可能被压扁
+  ListBox                                456 x 32        ← 高度偏小，可能被压扁
+  ScrollViewer                         454.4 x 30.4      ← 高度偏小，可能被压扁
+
+  [OK] 窗口可缩至 860x540（内容区滚动兜底）。
+=== narrow-quick（860x540，视口约 635）===
+  PageHost: 618.4 x 620
+    · 期望     612  ContentControl
+    · 期望     580  QuickMigrateView
+    · 期望   550.4  StackPanel含文本「目标根目录」
+    · 期望   550.4  TextBlock「链接类型全览：目录联接与目录符号链接用于目录；硬链接与文件符」
+    · 期望     456  ListBox
+    · 期望   454.4  ItemsPresenter
+    · 期望   454.4  StackPanel含文本「目录联接 (Junction)」
+    · 期望     320  StackPanel含文本「源目录（可多个，一次全部迁移并建链）」
+!! 探针失败：System.UnauthorizedAccessException: Access to the path 'C:\Users\31125\WorkBuddy\工具下载使用\DirPorter\tools\DirPorter.UiProbe\snapshots\narrow-scan.png' is denied.
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.File.Create(String path)
+   at DirPorter.UiProbe.Program.Render(FrameworkElement element, String path) in C:\Users\31125\WorkBuddy\工具下载使用\DirPorter\tools\DirPorter.UiProbe\Program.cs:line 532
+   at DirPorter.UiProbe.Program.Main(String[] args) in C:\Users\31125\WorkBuddy\工具下载使用\DirPorter\tools\DirPorter.UiProbe\Program.cs:line 160

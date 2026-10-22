@@ -1,0 +1,41 @@
+<Application x:Class="DirPorter.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:DirPorter.App.ViewModels"
+             xmlns:views="clr-namespace:DirPorter.App.Views"
+             xmlns:conv="clr-namespace:DirPorter.App.Converters">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- 共享样式；主题字典由 ThemeService 在启动时挂到末尾 -->
+                <ResourceDictionary Source="Themes/Shared.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <conv:BoolToStateConverter x:Key="BoolToStateConverter" />
+            <conv:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+
+            <!-- ViewModel → View 映射（外壳只用 ContentControl，不硬编码页面切换） -->
+            <DataTemplate DataType="{x:Type vm:QuickMigrateViewModel}">
+                <views:QuickMigrateView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:ScanViewModel}">
+                <views:ScanView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:MigrateViewModel}">
+                <views:MigrateView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:LinkViewModel}">
+                <views:LinkView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:HistoryViewModel}">
+                <views:HistoryView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:LinkOverviewViewModel}">
+                <views:LinkOverviewView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
+                <views:SettingsView />
+            </DataTemplate>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

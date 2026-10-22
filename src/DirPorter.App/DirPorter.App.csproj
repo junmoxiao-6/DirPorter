@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>DirPorter.App</RootNamespace>
+    <AssemblyName>dirporter</AssemblyName>
+    <AssemblyTitle>DirPorter 目录搬运工具</AssemblyTitle>
+    <Description>DirPorter 桌面端（WPF MVVM）+ 同一 exe 的命令行宿主。</Description>
+
+    <!-- 自定义 Main：无参启动 GUI，有参走 CLI（AttachConsole 接回父控制台）。 -->
+    <StartupObject>DirPorter.App.Program</StartupObject>
+
+    <!-- longPathAware + PerMonitorV2 DPI + asInvoker（按需提权；管理员变体由 publish.ps1 -RequireAdmin 指定）。 -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <!-- 应用图标：exe 文件图标（资源管理器/任务栏）；窗口标题栏图标见 MainWindow.xaml 的 Icon。 -->
+    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+
+    <!--
+      R12.8：内置更新清单地址（最终用户无需填写）。
+      发布方可用 `dotnet publish -p:UpdateFeedUrl=...` 覆盖；运行时优先级：
+        设置页填写 > 环境变量 DIRPORTER_UPDATE_URL > 本处编译期常量 > exe 同目录 latest.json
+    -->
+    <UpdateFeedUrl Condition="'$(UpdateFeedUrl)' == ''">https://junmo.de5.net/dirporter/latest.json</UpdateFeedUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 把更新地址编译进程序集元数据，运行时读取（避免改代码才能换源）。 -->
+    <AssemblyMetadata Include="UpdateFeedUrl" Value="$(UpdateFeedUrl)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 同一 ico 作为 WPF 资源打包（供 MainWindow.Icon 使用）。 -->
+    <Resource Include="Resources\app.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DirPorter.Core\DirPorter.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 单元测试需要验证表格交互等内部实现（DataGridRowActions 等） -->
+    <InternalsVisibleTo Include="DirPorter.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+  </ItemGroup>
+
+</Project>
