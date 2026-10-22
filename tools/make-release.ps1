@@ -50,9 +50,28 @@ if (-not $BaseUrl) {
 if (-not $BaseUrl) { $BaseUrl = 'https://junmo.de5.net/dirporter' }
 $BaseUrl = $BaseUrl.TrimEnd('/')
 
-# ---- 摘要与清单 ----
+# ---- 摘要 ----
 $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant()
 $size = (Get-Item $exe).Length
+
+# ---- GitHub 模式：不需要 latest.json（客户端直读 Releases API） ----
+if ($BaseUrl -match '^github:') {
+    $slug = $BaseUrl -replace '^github:', ''
+    Write-Host ""
+    Write-Host "=== 发布包就绪：$version （GitHub 模式）===" -ForegroundColor Cyan
+    Write-Host ("exe       : {0}" -f $exe)
+    Write-Host ("size      : {0:N0} 字节" -f $size)
+    Write-Host ("sha256    : {0}" -f $hash)
+    Write-Host ""
+    Write-Host "下一步（网页操作，GitHub Desktop 不能建 Release）：" -ForegroundColor Yellow
+    Write-Host "  1) 打开 https://github.com/$slug/releases/new"
+    Write-Host "  2) tag 填 v$version ，标题填 $version"
+    Write-Host "  3) 把上面的 exe 拖进 Attach binaries（文件名必须保持 dirporter.exe）"
+    Write-Host "  4) Publish release"
+    Write-Host ""
+    Write-Host "客户端会读 api.github.com 的 releases/latest，不需要额外清单文件。" -ForegroundColor Gray
+    return
+}
 
 $manifest = [ordered]@{
     version = $version

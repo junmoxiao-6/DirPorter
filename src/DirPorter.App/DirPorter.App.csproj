@@ -22,7 +22,7 @@
       发布方可用 `dotnet publish -p:UpdateFeedUrl=...` 覆盖；运行时优先级：
         设置页填写 > 环境变量 DIRPORTER_UPDATE_URL > 本处编译期常量 > exe 同目录 latest.json
     -->
-    <UpdateFeedUrl Condition="'$(UpdateFeedUrl)' == ''">https://junmo.de5.net/dirporter/latest.json</UpdateFeedUrl>
+    <UpdateFeedUrl Condition="'$(UpdateFeedUrl)' == ''">github:junmoxiao-6/DirPorter</UpdateFeedUrl>
   </PropertyGroup>
 
   <ItemGroup>
