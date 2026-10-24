@@ -50,6 +50,33 @@ if (-not $BaseUrl) {
 if (-not $BaseUrl) { $BaseUrl = 'https://junmo.de5.net/dirporter' }
 $BaseUrl = $BaseUrl.TrimEnd('/')
 
+# ---- 发行说明（优先读 docs\release-notes\v<版本>.md）----
+# 说明文档是"版本化资产"：完整内容贴到 GitHub Release 描述，
+# 其中 <!-- summary: ... --> 作为 latest.json 的 notes（客户端更新提示只显示这一句）。
+$notesFile = Join-Path $root "docs\release-notes\v$version.md"
+$notesSummary = ""
+
+if (Test-Path $notesFile) {
+    $notesText = Get-Content $notesFile -Raw
+
+    # 用 [regex]::Match 而不是 -match：后者在含换行/BOM 时容易匹配失败，
+    # 失败后会退化成"把注释原文当说明"（实测踩过）。
+    $m = [regex]::Match($notesText, 'summary:\s*(.+?)\s*-->', 'Singleline')
+
+    if ($m.Success) {
+        $notesSummary = ($m.Groups[1].Value -replace '\s+', ' ').Trim()
+    } else {
+        $notesSummary = (($notesText -split "`n" |
+                          Where-Object { $_.Trim() -and $_ -notmatch '^#' -and $_ -notmatch '^<!--' } |
+                          Select-Object -First 1))
+    }
+    Write-Host ("发行说明  : {0}" -f $notesFile) -ForegroundColor Gray
+} elseif ($Notes) {
+    $notesSummary = $Notes
+}
+
+if (-not $notesSummary) { $notesSummary = "DirPorter $version" }
+
 # ---- 摘要 ----
 $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant()
 $size = (Get-Item $exe).Length
@@ -68,7 +95,7 @@ if ($BaseUrl -match '^github:') {
         version = $version
         url     = $downloadUrl
         sha256  = $hash
-        notes   = if ($Notes) { $Notes } else { "DirPorter $version" }
+        notes   = $notesSummary
     }
 
     $jsonPath = Join-Path $root "dist\$version\latest.json"
@@ -98,7 +125,7 @@ $manifest = [ordered]@{
     version = $version
     url     = "$BaseUrl/$version/dirporter.exe"
     sha256  = $hash
-    notes   = if ($Notes) { $Notes } else { "DirPorter $version" }
+    notes   = $notesSummary
 }
 
 $jsonPath = Join-Path $root "dist\$version\latest.json"
