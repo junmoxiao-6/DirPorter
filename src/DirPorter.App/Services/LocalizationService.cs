@@ -342,6 +342,8 @@ public sealed class LocalizationService : INotifyPropertyChanged
                                    "Pick an existing file as the target (file symlink / hard link)."),
         ["link.created"] = ("链接创建成功：{0}", "Link created: {0}"),
         ["link.createFailed"] = ("链接创建失败：{0}", "Link creation failed: {0}"),
+        ["link.usableKinds"] = ("当前输入下可用：{0}", "Available for your input: {0}"),
+        ["link.useAutoHint"] = ("不想挑就把类型切回「自动推荐」，让程序替你选。", "Not sure? Switch the type back to 'Auto' and let the app decide."),
         ["link.needPrivilege"] = ("该操作需要管理员权限（或开启开发者模式）。", "This requires admin rights (or developer mode)."),
 
         // ---------------- 记录页 ----------------

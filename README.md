@@ -299,14 +299,20 @@ dirporter.exe sweepbackups --days 7 --yes      # 实际执行
 
 | 写法 | 说明 |
 |---|---|
-| `github:用户名/DirPorter` | 读 GitHub 最新 Release（推荐；发版只需在 Release 里上传 `dirporter.exe`） |
+| `github:用户名/DirPorter` | 读 GitHub 最新 Release（推荐；发版在 Release 里上传 `dirporter.exe` + `latest.json`） |
 | `https://github.com/用户名/DirPorter` | 同上 |
 | `https://任意地址/latest.json` | 自建静态清单：`{"version","url","sha256","notes"}` |
 
 GitHub 模式下版本取 Release 的 tag（如 `v0.3.0`），下载地址取名为 `dirporter.exe` 的附件，
 摘要优先用 GitHub 提供的 `digest`（没有则不做摘要校验）。
 
-发布新版本只需三步：推送代码 → 网页建 Release（tag 用 `v<版本>`）→ 上传 `dist\<版本>\dirporter.exe`。
+发布新版本只需三步：推送代码 → 网页建 Release（tag 用 `v<版本>`）→ 上传 `dist\<版本>\dirporter.exe` **和** `dist\<版本>\latest.json`。
+
+客户端优先读 `https://github.com/<owner>/<repo>/releases/latest/download/latest.json`
+（固定重定向地址，不经过 API、无 60 次/小时限流）；该附件缺失时自动回落到 `api.github.com`。
+
+更新由程序自身执行：主进程把副本放到临时目录，由它等主进程退出后**原子替换** exe 并重启，
+不依赖任何 cmd/bat；失败不会破坏现有程序，日志在 `%ProgramData%\DirPorter\logs\update.log`。
 
 ---
 

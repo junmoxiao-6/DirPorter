@@ -250,10 +250,32 @@ public sealed partial class LinkViewModel : ObservableObject
 
             if (!resolution.Capability.CanHandle)
             {
+                var loc = LocalizationService.Instance;
                 var message = resolution.Capability.Reason
                               + (string.IsNullOrWhiteSpace(resolution.Capability.Suggestion)
                                   ? string.Empty
                                   : Environment.NewLine + resolution.Capability.Suggestion);
+
+                // 只说"不支持"没用 —— 用户下一步该做什么必须摆出来：
+                // ① 当前输入下哪种类型可用；② 不想选就切回「自动推荐」让它替你决定。
+                var usable = Options
+                    .Where(o => o.CanHandle && o.Kind is not null)
+                    .Select(o => NameOf(o.Kind!.Value))
+                    .ToList();
+
+                if (usable.Count > 0)
+                {
+                    message += Environment.NewLine
+                               + string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                                   loc.Get("link.usableKinds"), string.Join(" / ", usable));
+                }
+
+                var auto = Options.FirstOrDefault(o => o.Kind is null && o.CanHandle);
+                if (auto is not null)
+                {
+                    message += Environment.NewLine + loc.Get("link.useAutoHint");
+                }
+
                 ResultText = message;
                 _ui.Error(message);
                 return;

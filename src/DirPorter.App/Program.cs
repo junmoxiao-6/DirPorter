@@ -32,6 +32,11 @@ internal static class Program
     {
         try
         {
+            // 自更新执行器：由主程序把自己复制到临时目录后带此参数启动。
+            // 必须在 GUI/控制台分流之前拦下 —— 它只做文件替换，不需要界面也不需要控制台。
+            if (DirPorter.Core.Update.SelfUpdater.IsInvocation(args))
+                return DirPorter.Core.Update.SelfUpdater.Run(args);
+
             if (args.Length > 0) return RunCliEntry(args);
             return RunGui();
         }

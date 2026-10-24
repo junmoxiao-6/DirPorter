@@ -575,7 +575,8 @@ public sealed partial class MigrateViewModel : ObservableObject
                 System.Windows.Application.Current?.Shutdown();
             }
 
-            return new MigrationRunSummary(0, 0, true, false, true, loc.Get("mig.blocked"));
+            return new MigrationRunSummary(0, 0, true, false, true,
+                BuildBlockedText(precheck, loc.Get("mig.blocked")));
         }
 
         if (precheck.RequiresAcknowledge && !AcknowledgeWarnings)
@@ -712,6 +713,34 @@ public sealed partial class MigrateViewModel : ObservableObject
     }
 
 
+
+    /// <summary>
+    /// 把硬拒绝项拼成"能照着做"的文案。
+    /// 只回一句"存在硬拒绝项"等于把问题丢回给用户（实测反馈：完全不知道该改什么）。
+    /// 现在列出：哪一项 + 具体细节 + 建议动作。
+    /// </summary>
+    private static string BuildBlockedText(PrecheckReport report, string header)
+    {
+        var items = report.Results.Where(static r => r.IsBlocking).Take(6).ToList();
+        if (items.Count == 0) return header;
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append(header).Append('（').Append(items.Count).Append(" 项）");
+
+        foreach (var item in items)
+        {
+            sb.AppendLine();
+            sb.Append("· ").Append(item.Title);
+
+            if (!string.IsNullOrWhiteSpace(item.Detail)) sb.Append('：').Append(item.Detail);
+            if (!string.IsNullOrWhiteSpace(item.UserGuide)) sb.AppendLine().Append("  → ").Append(item.UserGuide);
+        }
+
+        if (report.Results.Count(static r => r.IsBlocking) > items.Count)
+            sb.AppendLine().Append("…（还有更多，见下方预览）");
+
+        return sb.ToString();
+    }
 
     private async Task<PrecheckReport?> RunPrecheckAsync(IReadOnlyList<QueueItem>? items = null, bool createLink = true)
     {

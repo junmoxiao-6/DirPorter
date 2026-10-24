@@ -177,7 +177,8 @@ public sealed partial class QuickMigrateViewModel : ObservableObject
 
             if (summary.Blocked)
             {
-                Status = loc.Get("mig.blocked");
+                // summary.StatusText 里已带"哪一项被拒 + 建议怎么做"，别再覆盖成固定文案。
+                Status = summary.StatusText;
                 _ui.Error(Status);
                 return;
             }

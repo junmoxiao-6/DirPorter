@@ -90,12 +90,31 @@ public static class UpdateService
             throw new InvalidOperationException("no-feed");
         }
 
-        // GitHub Releases 直接读官方 API（发版时只需上传 exe，不必维护 latest.json）。
-        if (TryParseGitHub(feedUrl, out var apiUrl))
+        // GitHub：优先读 Release 的 latest.json（固定下载地址，不经过 API，没有 60 次/小时限流）；
+        // 只有该附件不存在时才回落 API —— 这样"发版漏传清单"也能工作，但正常路径更稳。
+        if (TryParseGitHub(feedUrl, out var apiUrl, out var slug))
         {
+            var manifestUrl = $"https://github.com/{slug}/releases/latest/download/latest.json";
+
+            try
+            {
+                return await CheckManifestAsync(manifestUrl, cancellationToken).ConfigureAwait(false);
+            }
+            catch (HttpRequestException)
+            {
+                // 常见于旧版本发版时没有上传 latest.json —— 降级到 API。
+            }
+
             return await CheckGitHubAsync(apiUrl, cancellationToken).ConfigureAwait(false);
         }
 
+        return await CheckManifestAsync(feedUrl, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>读取并校验「清单格式」（静态 JSON / Release 附件 / 本地文件）。</summary>
+    private static async Task<(bool HasUpdate, UpdateInfo? Info)> CheckManifestAsync(
+        string feedUrl, CancellationToken cancellationToken)
+    {
         var json = IsRemote(feedUrl)
             ? await Http.GetStringAsync(feedUrl, cancellationToken).ConfigureAwait(false)
             : await File.ReadAllTextAsync(feedUrl, cancellationToken).ConfigureAwait(false);
@@ -178,7 +197,7 @@ public static class UpdateService
         var exe = Environment.ProcessPath;
         if (string.IsNullOrWhiteSpace(exe) || !File.Exists(downloadedExe)) return false;
 
-        // ① 先确认目标目录可写，避免脚本空转 90 秒。
+        // ① 目标目录必须可写，否则让用户早点知道（而不是等替换时静默失败）。
         try
         {
             var probe = Path.Combine(Path.GetDirectoryName(exe)!, $".dp-write-probe-{Guid.NewGuid():N}");
@@ -189,7 +208,7 @@ public static class UpdateService
             return false;
         }
 
-        // ② 新 exe 挪到稳定位置（系统临时目录可能被清理），再交给脚本。
+        // ② 新版本挪到稳定位置（系统临时目录可能被清理）。
         string staged;
         try
         {
@@ -206,30 +225,28 @@ public static class UpdateService
             staged = downloadedExe;
         }
 
-        var script = Path.Combine(Path.GetTempPath(), $"dirporter-apply-{Guid.NewGuid():N}.cmd");
-
-        var content = $"""
-            @echo off
-            setlocal
-            set "SRC={staged}"
-            set "DST={exe}"
-            for /L %%i in (1,1,90) do (
-              copy /y "%SRC%" "%DST%" >nul 2>&1
-              if not errorlevel 1 goto launched
-              ping -n 2 127.0.0.1 >nul
-            )
-            :launched
-            start "" "%DST%"
-            del "%~f0"
-            """;
+        // ③ 把"自己"复制到临时目录，作为更新器运行：
+        //    它等主进程退出 → 校验大小 → 原子替换 → 重启。
+        //    不能用主进程自身直接替换（文件正被自己占用）。
+        var updater = Path.Combine(Path.GetTempPath(), $"dirporter-updater-{Guid.NewGuid():N}.exe");
 
         try
         {
-            File.WriteAllText(script, content);
-            Process.Start(new ProcessStartInfo("cmd.exe", $"/c \"{script}\"")
+            File.Copy(exe, updater, overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+
+        try
+        {
+            var arguments = $"apply-update --new \"{staged}\" --target \"{exe}\" --pid {Environment.ProcessId} --relaunch";
+
+            Process.Start(new ProcessStartInfo(updater, arguments)
             {
-                CreateNoWindow = true,
                 UseShellExecute = false,
+                CreateNoWindow = true,
                 WindowStyle = ProcessWindowStyle.Hidden,
             });
 
@@ -237,7 +254,7 @@ public static class UpdateService
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
         {
-            try { File.Delete(script); } catch (IOException) { }
+            try { File.Delete(updater); } catch (IOException) { }
             return false;
         }
     }
@@ -246,34 +263,40 @@ public static class UpdateService
     /// 识别 GitHub 形式的更新源，输出对应的 API 地址。
     /// 支持两种写法：<c>github:owner/repo</c> 与 <c>https://github.com/owner/repo</c>。
     /// </summary>
-    public static bool TryParseGitHub(string feedUrl, out string apiUrl)
+    public static bool TryParseGitHub(string feedUrl, out string apiUrl) =>
+        TryParseGitHub(feedUrl, out apiUrl, out _);
+
+    /// <summary>同上，额外给出 <c>owner/repo</c>（用于拼 Release 固定下载地址）。</summary>
+    public static bool TryParseGitHub(string feedUrl, out string apiUrl, out string slug)
     {
         apiUrl = string.Empty;
+        slug = string.Empty;
         if (string.IsNullOrWhiteSpace(feedUrl)) return false;
 
         var text = feedUrl.Trim();
-        string? slug = null;
+        string? raw = null;
 
         if (text.StartsWith("github:", StringComparison.OrdinalIgnoreCase))
         {
-            slug = text["github:".Length..];
+            raw = text["github:".Length..];
         }
         else
         {
             var marker = "github.com/";
             var index = text.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-            if (index >= 0) slug = text[(index + marker.Length)..];
+            if (index >= 0) raw = text[(index + marker.Length)..];
         }
 
-        if (slug is null) return false;
+        if (raw is null) return false;
 
-        var parts = slug.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var parts = raw.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length < 2) return false;
 
         // 去掉 .git 后缀（直接粘贴仓库地址的情况）。
         var repo = parts[1].EndsWith(".git", StringComparison.OrdinalIgnoreCase) ? parts[1][..^4] : parts[1];
 
-        apiUrl = $"https://api.github.com/repos/{parts[0]}/{repo}/releases/latest";
+        slug = $"{parts[0]}/{repo}";
+        apiUrl = $"https://api.github.com/repos/{slug}/releases/latest";
         return true;
     }
 

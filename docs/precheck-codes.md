@@ -2,7 +2,7 @@
 
 > ⚠️ 本文件由代码自动生成，请勿手工编辑。
 > 来源：`DirPorter.Core.Precheck.PrecheckCodes.All`（生成测试：`R2_CodeTableGenerationTests`）。
-> 生成时间：2026-10-23 00:06:23
+> 生成时间：2026-10-24 22:33:39
 
 ## 严重级别语义
 
