@@ -114,6 +114,9 @@ if ($BaseUrl -match '^github:') {
     Write-Host "  3) Attach binaries 里拖入**两个**文件："
     Write-Host "       - dist\$version\dirporter.exe   （文件名必须保持 dirporter.exe）"
     Write-Host "       - dist\$version\latest.json     （客户端优先读它，绕开 API 限流）"
+    if (Test-Path (Join-Path $root "dist\$version\dirporter-fd.exe")) {
+        Write-Host "       - dist\$version\dirporter-fd.exe（可选：1.6 MB 小体积版，需 .NET 8 Desktop Runtime）" -ForegroundColor Gray
+    }
     Write-Host "  4) Publish release"
     Write-Host ""
     Write-Host "客户端首选：https://github.com/$slug/releases/latest/download/latest.json" -ForegroundColor Gray

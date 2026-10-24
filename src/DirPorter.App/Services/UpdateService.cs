@@ -7,6 +7,9 @@ using System.Text.Json.Serialization;
 
 namespace DirPorter.App.Services;
 
+/// <summary>下载进度：百分比 + 已下载/总量 + 实时速度（慢网络下"有没有在动"比百分比更重要）。</summary>
+public sealed record DownloadProgress(double Percent, long Received, long Total, double BytesPerSecond);
+
 /// <summary>发布清单里的一个版本（约定的 JSON 结构）。</summary>
 public sealed record UpdateInfo(
     [property: JsonPropertyName("version")] string Version,
@@ -30,11 +33,20 @@ public sealed record UpdateInfo(
 /// </summary>
 public static class UpdateService
 {
-    private static readonly HttpClient Http = CreateClient();
+    /// <summary>检查清单用：需要"快速失败"。</summary>
+    private static readonly HttpClient Http = CreateClient(TimeSpan.FromSeconds(60));
 
-    private static HttpClient CreateClient()
+    /// <summary>
+    /// 下载更新包用：**不能设总超时**。
+    /// HttpClient.Timeout 覆盖"从发起到读完整个 body"，而更新包约 65 MB ——
+    /// 30 秒的限制会让它必然超时（0.3.2 实测：检查能过、下载必挂）。
+    /// 这里改为无总超时，由调用方用 CancellationToken 控制整体上限。
+    /// </summary>
+    private static readonly HttpClient DownloadHttp = CreateClient(System.Threading.Timeout.InfiniteTimeSpan);
+
+    private static HttpClient CreateClient(TimeSpan timeout)
     {
-        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        var client = new HttpClient { Timeout = timeout };
 
         // GitHub API 强制要求 User-Agent，缺失会直接 403。
         client.DefaultRequestHeaders.UserAgent.ParseAdd("DirPorter-UpdateChecker/1.0");
@@ -91,21 +103,36 @@ public static class UpdateService
         }
 
         // GitHub：优先读 Release 的 latest.json（固定下载地址，不经过 API，没有 60 次/小时限流）；
-        // 只有该附件不存在时才回落 API —— 这样"发版漏传清单"也能工作，但正常路径更稳。
+        // 该附件缺失/网络不通时回落 API。
+        // 两条路径各自重试一次：国内访问 GitHub 偶发抽风很常见，一次失败不代表源不可用。
         if (TryParseGitHub(feedUrl, out var apiUrl, out var slug))
         {
             var manifestUrl = $"https://github.com/{slug}/releases/latest/download/latest.json";
+            var failures = new List<string>();
 
-            try
+            foreach (var channel in new[] { "Release 清单", "GitHub API" })
             {
-                return await CheckManifestAsync(manifestUrl, cancellationToken).ConfigureAwait(false);
-            }
-            catch (HttpRequestException)
-            {
-                // 常见于旧版本发版时没有上传 latest.json —— 降级到 API。
+                for (var attempt = 1; attempt <= 2; attempt++)
+                {
+                    try
+                    {
+                        return channel == "Release 清单"
+                            ? await CheckManifestAsync(manifestUrl, cancellationToken).ConfigureAwait(false)
+                            : await CheckGitHubAsync(apiUrl, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
+                    {
+                        failures.Add($"{channel} 第 {attempt} 次：{DescribeNetworkError(ex)}");
+
+                        if (attempt < 2) await Task.Delay(1500, cancellationToken).ConfigureAwait(false);
+                    }
+                }
             }
 
-            return await CheckGitHubAsync(apiUrl, cancellationToken).ConfigureAwait(false);
+            throw new HttpRequestException(
+                "无法访问更新源（已依次尝试 Release 清单与 API，各重试一次）。" +
+                string.Join("；", failures.Distinct()) +
+                "。请检查网络或代理后重试。");
         }
 
         return await CheckManifestAsync(feedUrl, cancellationToken).ConfigureAwait(false);
@@ -138,51 +165,141 @@ public static class UpdateService
         return Version.TryParse(text, out var remote) && remote > current;
     }
 
-    /// <summary>下载新版本到临时目录，返回本地路径（有 sha256 则必须匹配）。</summary>
-    public static async Task<string> DownloadAsync(UpdateInfo info, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// 下载更新包（R12.16）。
+    ///
+    /// 两个关键点，都是被实测逼出来的：
+    /// <list type="number">
+    /// <item><b>不设总超时</b>：更新包约 65 MB，国内直连 GitHub 实测只有 ~21 KB/s，
+    ///   固定超时必然半途而废；这里只设 45 分钟上限（足够 20 KB/s 下完 65 MB）。</item>
+    /// <item><b>断点续传</b>：先写 <c>.part</c>，中断后下次用 Range 从断点继续 ——
+    ///   慢网络下要用户从头再来一遍是不可接受的。</item>
+    /// </list>
+    /// 有 sha256 时下载完强制校验；不匹配则删除临时文件并报错。
+    /// </summary>
+    public static async Task<string> DownloadAsync(
+        UpdateInfo info, IProgress<DownloadProgress>? progress = null, CancellationToken cancellationToken = default)
     {
-        var target = Path.Combine(Path.GetTempPath(), $"dirporter-update-{Guid.NewGuid():N}.exe");
-
         if (!IsRemote(info.Url))
         {
-            File.Copy(info.Url, target, overwrite: true);
+            var copy = Path.Combine(Path.GetTempPath(), $"dirporter-update-{Guid.NewGuid():N}.exe");
+            File.Copy(info.Url, copy, overwrite: true);
+            VerifyOrThrow(copy, info.Sha256);
+            return copy;
         }
-        else
+
+        var staging = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DirPorter", "updates");
+        Directory.CreateDirectory(staging);
+
+        var tag = Sanitize(info.Version);
+        var hashTag = string.IsNullOrWhiteSpace(info.Sha256) ? "nohash" : info.Sha256!.Trim()[..Math.Min(8, info.Sha256.Trim().Length)];
+        var partPath = Path.Combine(staging, $"dirporter-{tag}-{hashTag}.part");
+        var exePath = Path.Combine(staging, $"dirporter-{tag}-{hashTag}.exe");
+
+        // 之前已经下完并校验通过 → 直接复用。
+        if (File.Exists(exePath) && HashMatches(exePath, info.Sha256)) return exePath;
+
+        var offset = File.Exists(partPath) ? new FileInfo(partPath).Length : 0;
+
+        using var overall = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        overall.CancelAfter(TimeSpan.FromMinutes(45));
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, info.Url);
+        if (offset > 0) request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(offset, null);
+
+        using var response = await DownloadHttp
+            .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, overall.Token)
+            .ConfigureAwait(false);
+
+        response.EnsureSuccessStatusCode();
+
+        // 只有服务端认了 Range（206）才能续写；返回 200 说明要从头开始。
+        var append = offset > 0 && response.StatusCode == System.Net.HttpStatusCode.PartialContent;
+        if (!append) offset = 0;
+
+        var length = response.Content.Headers.ContentLength ?? -1;
+        var total = length > 0 ? length + offset : -1;
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        long received = offset;
+        long lastReportTicks = 0;
+        var lastBytes = offset;
+
+        await using (var source = await response.Content.ReadAsStreamAsync(overall.Token).ConfigureAwait(false))
+        await using (var destination = new FileStream(
+                         partPath, append ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None))
         {
-            using var response = await Http.GetAsync(info.Url, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
-
-            var total = response.Content.Headers.ContentLength ?? -1;
-            await using var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            await using var destination = File.Create(target);
-
             var buffer = new byte[81920];
-            long done = 0;
             int read;
 
-            while ((read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+            while ((read = await source.ReadAsync(buffer, overall.Token).ConfigureAwait(false)) > 0)
             {
-                await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
-                done += read;
+                await destination.WriteAsync(buffer.AsMemory(0, read), overall.Token).ConfigureAwait(false);
+                received += read;
 
-                if (total > 0) progress?.Report((double)done / total * 100);
+                // 500ms 节流：太频繁会让 UI 线程被格式化和刷新淹没。
+                var now = stopwatch.ElapsedMilliseconds;
+                if (now - lastReportTicks < 500 && received != total) continue;
+
+                lastReportTicks = now;
+                var seconds = Math.Max(0.001, stopwatch.Elapsed.TotalSeconds);
+                var speed = (received - lastBytes) / Math.Max(0.001, (now - (lastReportTicks - 500)) / 1000.0);
+
+                progress?.Report(new DownloadProgress(
+                    total > 0 ? (double)received / total * 100 : 0,
+                    received,
+                    total,
+                    speed));
+
+                lastBytes = received;
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(info.Sha256))
+        if (total > 0 && received < total)
         {
-            var actual = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(target)));
-
-            if (!string.Equals(actual, info.Sha256.Trim(), StringComparison.OrdinalIgnoreCase))
-            {
-                try { File.Delete(target); } catch (IOException) { }
-
-                throw new InvalidDataException(
-                    $"下载文件校验失败（期望 {info.Sha256.Trim()[..Math.Min(12, info.Sha256.Trim().Length)]}…，实际 {actual[..12]}…）。");
-            }
+            throw new IOException($"下载不完整（{received:N0} / {total:N0} 字节）。已保留断点，重试会继续。");
         }
 
-        return target;
+        VerifyOrThrow(partPath, info.Sha256);
+
+        File.Move(partPath, exePath, overwrite: true);
+        return exePath;
+    }
+
+    private static string Sanitize(string version)
+    {
+        var chars = version.Where(static c => char.IsLetterOrDigit(c) || c is '.' or '-' or '_').ToArray();
+        return chars.Length == 0 ? "unknown" : new string(chars);
+    }
+
+    private static bool HashMatches(string path, string? expected)
+    {
+        if (string.IsNullOrWhiteSpace(expected)) return File.Exists(path);
+
+        try
+        {
+            var actual = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
+            return string.Equals(actual, expected.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
+    private static void VerifyOrThrow(string path, string? expected)
+    {
+        if (string.IsNullOrWhiteSpace(expected)) return;
+
+        var actual = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
+
+        if (string.Equals(actual, expected.Trim(), StringComparison.OrdinalIgnoreCase)) return;
+
+        try { File.Delete(path); } catch (IOException) { }
+
+        throw new InvalidDataException(
+            $"下载文件校验失败（期望 {expected.Trim()[..Math.Min(12, expected.Trim().Length)]}…，实际 {actual[..12]}…）。已删除临时文件。");
     }
 
     /// <summary>
@@ -342,6 +459,16 @@ public static class UpdateService
         var info = new UpdateInfo(tag, url, sha, notes);
         return (IsNewer(tag, CurrentVersion), info);
     }
+
+    /// <summary>把网络异常翻译成用户能懂的一句话（界面上不再暴露 .NET 原始文案）。</summary>
+    public static string DescribeNetworkError(Exception ex) => ex switch
+    {
+        TaskCanceledException => "超时（60 秒内没有响应）",
+        HttpRequestException { StatusCode: not null } h => $"HTTP {(int)h.StatusCode}",
+        HttpRequestException => "连接失败",
+        IOException => "读取中断",
+        _ => ex.GetType().Name,
+    };
 
     private static bool IsRemote(string url) =>
         url.StartsWith("http://", StringComparison.OrdinalIgnoreCase)

@@ -139,8 +139,19 @@ public sealed partial class SettingsViewModel : ObservableObject
                 System.Globalization.CultureInfo.CurrentCulture,
                 loc.Get("set.updateFoundShort"), info.Version);
 
-            var progress = new Progress<double>(p => UpdateStatus = string.Format(
-                System.Globalization.CultureInfo.CurrentCulture, loc.Get("set.updateProgress"), p));
+            // 慢网络下"有没有在动、还剩多久"比百分比更重要：把速度也显示出来。
+            var progress = new Progress<DownloadProgress>(p =>
+            {
+                const double mb = 1024 * 1024;
+
+                UpdateStatus = p.Total > 0
+                    ? string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                        loc.Get("set.updateProgressDetail"),
+                        p.Percent, p.Received / mb, p.Total / mb, p.BytesPerSecond / mb)
+                    : string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                        loc.Get("set.updateProgressUnknown"),
+                        p.Received / mb, p.BytesPerSecond / mb);
+            });
 
             var file = await UpdateService.DownloadAsync(info, progress).ConfigureAwait(true);
             UpdateStatus = loc.Get("set.updateVerifying");
@@ -156,7 +167,12 @@ public sealed partial class SettingsViewModel : ObservableObject
                 _host.Interaction.Error(loc.Get("set.updateApplyFailed"));
             }
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidDataException
+        catch (TaskCanceledException)
+        {
+            // 超时单独给一句人话：别让用户对着 "HttpClient.Timeout of 30 seconds" 发呆。
+            UpdateStatus = loc.Get("set.updateTimeout");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidDataException
                                        or JsonException or IOException or UnauthorizedAccessException)
         {
             UpdateStatus = loc.Get("set.updateFailed") + " " + ex.Message;

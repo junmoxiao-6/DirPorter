@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011%20x64-0078D4.svg)](#系统要求)
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg)](https://dotnet.microsoft.com/download/dotnet/8.0)
-[![Version](https://img.shields.io/badge/version-0.3.3-brightgreen.svg)](../../releases/latest)
+[![Version](https://img.shields.io/badge/version-0.3.4-brightgreen.svg)](../../releases/latest)
 
 ---
 
