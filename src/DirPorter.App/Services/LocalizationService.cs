@@ -76,6 +76,8 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["lov.roots"] = ("扫描范围", "Scan scope"),
         ["lov.hint"] = ("在下列范围内查找目录联接、目录符号链接与文件符号链接；勾选「包含硬链接」会逐个文件检查（较慢）。遇到链接不会递归进去，避免重复与环。",
                         "Finds junctions, directory symlinks and file symlinks under these roots. \"Include hard links\" checks every file (slower). Links are not recursed into."),
+        ["lov.doneWithDangling"] = ("共 {0} 个链接，其中 {1} 个目标已丢失（悬空）—— 对应程序会读不到数据，请重新建链或还原。",
+                                     "{0} links, {1} with missing targets (dangling) — the owning app can't read its data."),
         ["lov.includeHardLinks"] = ("包含硬链接（较慢）", "Include hard links (slow)"),
         ["lov.includeHardLinksHint"] = ("硬链接需要逐文件读取链接数，范围大时耗时明显。", "Hard links require per-file link-count checks."),
         ["lov.scan"] = ("扫描", "Scan"),

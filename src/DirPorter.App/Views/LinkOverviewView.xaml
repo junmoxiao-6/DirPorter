@@ -59,8 +59,21 @@
         <DockPanel Grid.Row="2">
             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
                 <TextBlock Style="{StaticResource SectionTitle}" Text="{markup:Loc lov.results}" />
-                <TextBlock DockPanel.Dock="Right" Style="{StaticResource Hint}" Text="{Binding Status}"
-                           VerticalAlignment="Center" HorizontalAlignment="Right" />
+                <!-- 悬空链接必须"一眼看见"：目标被搬走后程序会读不到数据，只写进列表里没人会注意。 -->
+                <TextBlock DockPanel.Dock="Right" Text="{Binding Status}"
+                           VerticalAlignment="Center" HorizontalAlignment="Right"
+                           TextTrimming="CharacterEllipsis" MaxWidth="440">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource Hint}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasDangling}" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource DangerFg}" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </DockPanel>
 
             <Grid>

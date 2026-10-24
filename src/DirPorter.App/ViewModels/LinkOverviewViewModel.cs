@@ -33,6 +33,9 @@ public sealed partial class LinkOverviewViewModel : ObservableObject
     [ObservableProperty] private bool _includeHardLinks;
     [ObservableProperty] private string _status;
 
+    /// <summary>本次扫描是否发现"目标已丢失"的悬空链接（用于界面标红）。</summary>
+    [ObservableProperty] private bool _hasDangling;
+
     public bool HasLinks => Links.Count > 0;
 
     public bool CanScan => !IsScanning;
@@ -75,7 +78,13 @@ public sealed partial class LinkOverviewViewModel : ObservableObject
             foreach (var link in found) Links.Add(link);
 
             OnPropertyChanged(nameof(HasLinks));
-            Status = string.Format(System.Globalization.CultureInfo.CurrentCulture, loc.Get("lov.done"), Links.Count);
+            var dangling = Links.Count(static l => l.IsDangling);
+            HasDangling = dangling > 0;
+
+            Status = dangling == 0
+                ? string.Format(System.Globalization.CultureInfo.CurrentCulture, loc.Get("lov.done"), Links.Count)
+                : string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                    loc.Get("lov.doneWithDangling"), Links.Count, dangling);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

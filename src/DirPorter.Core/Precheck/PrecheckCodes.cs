@@ -186,6 +186,7 @@ public static class PrecheckCodes
         string detail,
         string? relatedPath = null,
         string? win32 = null,
-        string? entryId = null)
-        => new(info.Code, info.Severity, info.Title, detail, info.Action, info.UserGuide, relatedPath, win32, entryId);
+        string? entryId = null,
+        string? userGuide = null)
+        => new(info.Code, info.Severity, info.Title, detail, info.Action, userGuide ?? info.UserGuide, relatedPath, win32, entryId);
 }

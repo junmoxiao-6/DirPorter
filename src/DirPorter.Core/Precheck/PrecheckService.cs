@@ -352,8 +352,10 @@ public sealed class PrecheckService : IPrecheckService
                 if (isReparse)
                 {
                     results.Add(PrecheckCodes.Create(PrecheckCodes.TgtExistsNonEmpty,
-                        $"目标路径已存在一个链接：{targetPlain}。请改用其它目标位置或先解除该链接。",
-                        targetPlain, entryId: item.EntryId));
+                        $"目标路径已存在一个链接：{targetPlain}。",
+                        targetPlain, entryId: item.EntryId,
+                        userGuide: $"如果数据已经在 {targetPlain}，不需要迁移：到「链接」页把 {sourcePlain} 指向它即可；" +
+                                   "否则请改用其它目标位置，或先解除该链接。"));
                     completed++;
                     continue;
                 }
@@ -370,7 +372,9 @@ public sealed class PrecheckService : IPrecheckService
                 if (entries.Count > 0)
                 {
                     results.Add(PrecheckCodes.Create(PrecheckCodes.TgtExistsNonEmpty,
-                        $"目标位置已存在同名且非空的目录：{targetPlain}", targetPlain, entryId: item.EntryId));
+                        $"目标位置已存在同名且非空的目录：{targetPlain}", targetPlain, entryId: item.EntryId,
+                        userGuide: $"如果那是你之前搬过去的数据，**不需要再迁移**：到「链接」页把 {sourcePlain} 指向 {targetPlain} 即可；" +
+                                   "否则请给目标改名，或先自行处理该目录内容（工具不会覆盖或合并非空目录）。"));
                     completed++;
                     continue;
                 }
