@@ -60,10 +60,10 @@ public sealed class RobocopyCopier : IFileCopier
         // /COPYALL 含 U（SACL 审计信息），需要 SeSecurityPrivilege。
         // 实测（本机非管理员）：使用 /COPYALL 时 robocopy 直接返回 16（严重错误，一个文件都不复制）。
         // 因此非提权时默认降级为 /COPY:DATSO（仍保留 ACL / 所有者 / 属性 / 时间戳 / ADS，仅少了审计 SACL）。
-        var useCopyAll = _privileges.IsElevated;
+        var useCopyAll = _privileges.IsElevated && request.Options.CopySecurity;
         var result = await RunOnceAsync(source, target, request.Options, useCopyAll, progress, cancellationToken).ConfigureAwait(false);
 
-        // 兜底：即使已提权，个别令牌也可能没有 SeSecurityPrivilege → 检测到 16 就自动降级重试一次。
+        // 兜底 1：即使已提权，个别令牌也可能没有 SeSecurityPrivilege → 检测到 16 就自动降级重试一次。
         if (result.ExitCode == 16 && useCopyAll && result.Outcome != CopyOutcome.Canceled)
         {
             var retry = await RunOnceAsync(source, target, request.Options, useCopyAll: false, progress, cancellationToken).ConfigureAwait(false);
@@ -74,9 +74,51 @@ public sealed class RobocopyCopier : IFileCopier
             };
         }
 
+        // 兜底 2（R12.17）：/COPY:DATSO 里的 O（所有者）需要 SeRestorePrivilege。
+        // 在受限令牌 / 沙箱 / 非提权环境里，robocopy 会对**每个文件**报
+        // 「错误 5（0x00000005）正在将 NTFS 安全复制到目标文件中」并按退出码 8 整体失败——
+        // 实测 1376 项全灭、已复制的数据被全部回滚，等于迁移完全做不成。
+        // 此时降级为 /COPY:DAT（只搬数据/属性/时间戳，不碰 DACL 与所有者）重试，
+        // 用一次可接受的安全信息损失换回"迁移能成功"。降级事实通过 SecurityNote 明示。
+        if (result.Outcome == CopyOutcome.Failed
+            && request.Options.CopySecurity
+            && result.Failures.Any(IsSecurityCopyFailure))
+        {
+            var degraded = request.Options with { CopySecurity = false };
+            var retry = await RunOnceAsync(source, target, degraded, useCopyAll: false, progress, cancellationToken).ConfigureAwait(false);
+            return retry with
+            {
+                SecurityNote = "首次复制因「NTFS 安全信息（DACL/所有者）拒绝访问」失败（错误 5，通常是非提权或受限令牌），"
+                               + "已自动降级为 /COPY:DAT 重试：数据、属性、时间戳、ADS 正常复制，但 **DACL/所有者未搬运**，"
+                               + "目标目录将继承目标卷的权限。",
+            };
+        }
+
+        if (!request.Options.CopySecurity)
+        {
+            return result with { SecurityNote = "已按 --no-security 跳过安全信息复制（未搬运 DACL/所有者/审计）。" };
+        }
+
         return useCopyAll
             ? result
             : result with { SecurityNote = "以普通权限运行：使用 /COPY:DATSO（审计 SACL 需要管理员，未复制）。" };
+    }
+
+    /// <summary>
+    /// 判断一条失败是否是"复制 NTFS 安全信息被拒"。
+    /// robocopy 中文/英文日志的原文分别是
+    /// 「正在将 NTFS 安全复制到目标文件中」与 "Copying NTFS Security to Destination File"，
+    /// 错误码固定为 5（ERROR_ACCESS_DENIED）。
+    /// </summary>
+    internal static bool IsSecurityCopyFailure(CopyFailure failure)
+    {
+        var text = failure.Reason ?? string.Empty;
+
+        return text.Contains("NTFS 安全", StringComparison.Ordinal)
+               || text.Contains("NTFS Security", StringComparison.OrdinalIgnoreCase)
+               || text.Contains("0x00000005", StringComparison.Ordinal)
+               || text.Contains("错误 5", StringComparison.Ordinal)
+               || text.Contains("ERROR 5", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>执行一次 robocopy。</summary>
@@ -142,22 +184,34 @@ public sealed class RobocopyCopier : IFileCopier
     }
 
     /// <summary>当前权限下将使用的安全信息复制开关（供 Dry-run 与日志复现）。</summary>
-    public static string DescribeCopySwitch(bool isElevated)
-        => isElevated
+    public static string DescribeCopySwitch(bool isElevated, bool copySecurity = true)
+    {
+        // R12.17：dry-run 必须反映 --no-security，否则用户看到的开关和实际执行不一致。
+        if (!copySecurity) return "/COPY:DAT（数据+属性+时间戳；安全信息已按 --no-security 跳过）";
+
+        return isElevated
             ? "/COPYALL（数据+属性+时间戳+SACL+所有者+审计）"
             : "/COPY:DATSO（数据+属性+时间戳+SACL+所有者；审计 SACL 需管理员，非提权时会自动降级）";
+    }
 
     /// <summary>
     /// 构造固定参数集。参数顺序与内容都刻意固定，便于日志复盘与回归对比。
     /// </summary>
     public static List<string> BuildArguments(string source, string target, CopyOptions options, string logPath, bool useCopyAll = true)
     {
+        // R12.17 修复：此前这里写死 useCopyAll ? /COPYALL : /COPY:DATSO，
+        // 完全忽略 options.CopySecurity —— `--no-security` 对 robocopy 引擎无效，
+        // 于是非提权环境仍在逐文件复制所有者信息，全部报「错误 5」并整体回滚。
+        var copySwitch = !options.CopySecurity
+            ? "/COPY:DAT"
+            : useCopyAll ? "/COPYALL" : "/COPY:DATSO";
+
         var arguments = new List<string>
         {
             source,
             target,
             "/E",                 // 复制子目录（含空目录）
-            useCopyAll ? "/COPYALL" : "/COPY:DATSO",
+            copySwitch,           // 安全信息档位（受 --no-security 控制）
             "/DCOPY:DAT",         // 目录：数据 + 属性 + 时间戳
             "/R:" + options.RetryCount,
             "/W:" + options.RetryWaitSeconds,

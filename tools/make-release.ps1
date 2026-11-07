@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     生成发布包与更新清单（latest.json）。
 
@@ -57,7 +57,7 @@ $notesFile = Join-Path $root "docs\release-notes\v$version.md"
 $notesSummary = ""
 
 if (Test-Path $notesFile) {
-    $notesText = Get-Content $notesFile -Raw
+    $notesText = Get-Content -LiteralPath $notesFile -Raw -Encoding UTF8
 
     # 用 [regex]::Match 而不是 -match：后者在含换行/BOM 时容易匹配失败，
     # 失败后会退化成"把注释原文当说明"（实测踩过）。
@@ -99,7 +99,9 @@ if ($BaseUrl -match '^github:') {
     }
 
     $jsonPath = Join-Path $root "dist\$version\latest.json"
-    $manifest | ConvertTo-Json -Depth 3 | Set-Content -Path $jsonPath -Encoding UTF8
+    # 必须写"无 BOM 的 UTF-8"：带 BOM 时客户端 JsonSerializer 解析会报无效字符。
+    $json = $manifest | ConvertTo-Json -Depth 3
+    [System.IO.File]::WriteAllText($jsonPath, $json, (New-Object System.Text.UTF8Encoding($false)))
 
     Write-Host ""
     Write-Host "=== 发布包就绪：$version （GitHub 模式）===" -ForegroundColor Cyan
@@ -132,7 +134,8 @@ $manifest = [ordered]@{
 }
 
 $jsonPath = Join-Path $root "dist\$version\latest.json"
-$manifest | ConvertTo-Json -Depth 3 | Set-Content -Path $jsonPath -Encoding UTF8
+$json = $manifest | ConvertTo-Json -Depth 3
+[System.IO.File]::WriteAllText($jsonPath, $json, (New-Object System.Text.UTF8Encoding($false)))
 
 # ---- 报告 ----
 Write-Host ""

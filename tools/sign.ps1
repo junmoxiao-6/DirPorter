@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     给 dirporter.exe（以及安装包）做 Authenticode 代码签名。
 

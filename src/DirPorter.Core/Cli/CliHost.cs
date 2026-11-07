@@ -553,7 +553,7 @@ public static class CliHost
             }
             else
             {
-                stdout.WriteLine($"                    复制开关：{Copy.RobocopyCopier.DescribeCopySwitch(Privilege.Win32PrivilegeProbe.Current.IsElevated)}");
+                stdout.WriteLine($"                    复制开关：{Copy.RobocopyCopier.DescribeCopySwitch(Privilege.Win32PrivilegeProbe.Current.IsElevated, copySecurity: options.CopySecurity)}");
             }
             stdout.WriteLine("  4) VERIFYING       文件数 + 总字节 + 逐文件 size/mtime 比对");
             stdout.WriteLine("  5) PARKING         源目录同卷改名为 .migbak\\<name>_<ts>");
