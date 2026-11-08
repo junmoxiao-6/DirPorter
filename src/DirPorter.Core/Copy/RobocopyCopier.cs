@@ -57,41 +57,33 @@ public sealed class RobocopyCopier : IFileCopier
         var source = PathNormalizer.StripExtendedPrefix(PathNormalizer.NormalizeAbsolute(request.SourcePath));
         var target = PathNormalizer.StripExtendedPrefix(PathNormalizer.NormalizeAbsolute(request.TargetPath));
 
-        // /COPYALL 含 U（SACL 审计信息），需要 SeSecurityPrivilege。
-        // 实测（本机非管理员）：使用 /COPYALL 时 robocopy 直接返回 16（严重错误，一个文件都不复制）。
-        // 因此非提权时默认降级为 /COPY:DATSO（仍保留 ACL / 所有者 / 属性 / 时间戳 / ADS，仅少了审计 SACL）。
-        var useCopyAll = _privileges.IsElevated && request.Options.CopySecurity;
-        var result = await RunOnceAsync(source, target, request.Options, useCopyAll, progress, cancellationToken).ConfigureAwait(false);
+        // 安全信息档位（R12.18）：不再"一刀切"降到 /COPY:DAT，而是逐级下探
+        //   /COPYALL → /COPY:DATSO → /COPY:DATS → /COPY:DAT
+        // 中间那一档 DATS 只放弃"所有者(O)"，仍保留 DACL —— 目标目录权限与源一致，
+        // 只是所有者归到执行者。比直接丢掉整份安全描述符安全得多。
+        var mode = !request.Options.CopySecurity
+            ? SecurityMode.Dat
+            : _privileges.IsElevated ? SecurityMode.CopyAll : SecurityMode.Datso;
 
-        // 兜底 1：即使已提权，个别令牌也可能没有 SeSecurityPrivilege → 检测到 16 就自动降级重试一次。
-        if (result.ExitCode == 16 && useCopyAll && result.Outcome != CopyOutcome.Canceled)
+        var initialMode = mode;
+        var result = await RunOnceAsync(source, target, request.Options, mode, progress, cancellationToken).ConfigureAwait(false);
+
+        while (ShouldDegrade(result, mode))
         {
-            var retry = await RunOnceAsync(source, target, request.Options, useCopyAll: false, progress, cancellationToken).ConfigureAwait(false);
-            return retry with
+            var previous = mode;
+            mode = NextDegrade(mode);
+
+            result = await RunOnceAsync(source, target, request.Options, mode, progress, cancellationToken).ConfigureAwait(false);
+
+            if (result.Outcome != CopyOutcome.Failed)
             {
-                SecurityNote = $"首次使用 /COPYALL 失败（退出码 16，通常是缺少 SeSecurityPrivilege），"
-                               + "已自动降级为 /COPY:DATSO 重试（ACL/所有者/属性/时间戳/ADS 仍保留，仅审计 SACL 未复制）。",
-            };
+                return result with { SecurityNote = DescribeDegrade(initialMode, previous, mode) };
+            }
         }
 
-        // 兜底 2（R12.17）：/COPY:DATSO 里的 O（所有者）需要 SeRestorePrivilege。
-        // 在受限令牌 / 沙箱 / 非提权环境里，robocopy 会对**每个文件**报
-        // 「错误 5（0x00000005）正在将 NTFS 安全复制到目标文件中」并按退出码 8 整体失败——
-        // 实测 1376 项全灭、已复制的数据被全部回滚，等于迁移完全做不成。
-        // 此时降级为 /COPY:DAT（只搬数据/属性/时间戳，不碰 DACL 与所有者）重试，
-        // 用一次可接受的安全信息损失换回"迁移能成功"。降级事实通过 SecurityNote 明示。
-        if (result.Outcome == CopyOutcome.Failed
-            && request.Options.CopySecurity
-            && result.Failures.Any(IsSecurityCopyFailure))
+        if (mode != initialMode)
         {
-            var degraded = request.Options with { CopySecurity = false };
-            var retry = await RunOnceAsync(source, target, degraded, useCopyAll: false, progress, cancellationToken).ConfigureAwait(false);
-            return retry with
-            {
-                SecurityNote = "首次复制因「NTFS 安全信息（DACL/所有者）拒绝访问」失败（错误 5，通常是非提权或受限令牌），"
-                               + "已自动降级为 /COPY:DAT 重试：数据、属性、时间戳、ADS 正常复制，但 **DACL/所有者未搬运**，"
-                               + "目标目录将继承目标卷的权限。",
-            };
+            return result with { SecurityNote = DescribeDegrade(initialMode, initialMode, mode) };
         }
 
         if (!request.Options.CopySecurity)
@@ -99,9 +91,57 @@ public sealed class RobocopyCopier : IFileCopier
             return result with { SecurityNote = "已按 --no-security 跳过安全信息复制（未搬运 DACL/所有者/审计）。" };
         }
 
-        return useCopyAll
+        return mode == SecurityMode.CopyAll
             ? result
             : result with { SecurityNote = "以普通权限运行：使用 /COPY:DATSO（审计 SACL 需要管理员，未复制）。" };
+    }
+
+    /// <summary>需要继续降级吗：严重错误 16（缺 SeSecurityPrivilege）或"复制 NTFS 安全信息被拒"。</summary>
+    internal static bool ShouldDegrade(CopyResult result, SecurityMode mode)
+    {
+        if (mode == SecurityMode.Dat) return false;                  // 已到最低档
+        if (result.Outcome == CopyOutcome.Canceled) return false;    // 用户取消，不折腾
+        if (result.Outcome != CopyOutcome.Failed) return false;
+
+        if (result.ExitCode == 16) return true;                      // 一个文件都没复制：权限档位过高
+        return result.Failures.Any(IsSecurityCopyFailure);
+    }
+
+    /// <summary>降级链的下一档。</summary>
+    internal static SecurityMode NextDegrade(SecurityMode mode) => mode switch
+    {
+        SecurityMode.CopyAll => SecurityMode.Datso,
+        SecurityMode.Datso => SecurityMode.Dats,
+        SecurityMode.Dats => SecurityMode.Dat,
+        _ => SecurityMode.Dat,
+    };
+
+    /// <summary>档位对应的 robocopy 开关。</summary>
+    internal static string SwitchOf(SecurityMode mode) => mode switch
+    {
+        SecurityMode.CopyAll => "/COPYALL",
+        SecurityMode.Datso => "/COPY:DATSO",
+        SecurityMode.Dats => "/COPY:DATS",
+        _ => "/COPY:DAT",
+    };
+
+    private static string DescribeDegrade(SecurityMode initial, SecurityMode failedAt, SecurityMode final)
+    {
+        var cause = failedAt == SecurityMode.CopyAll
+            ? "退出码 16，通常是缺少 SeSecurityPrivilege"
+            : "「错误 5（0x00000005）复制 NTFS 安全信息」被拒，通常是缺少 SeRestorePrivilege / 非提权";
+
+        var kept = final switch
+        {
+            SecurityMode.CopyAll => "数据/属性/时间戳/ADS + DACL + 所有者 + 审计全部保留",
+            SecurityMode.Datso => "数据/属性/时间戳/ADS + DACL + 所有者保留（审计 SACL 未复制）",
+            SecurityMode.Dats => "数据/属性/时间戳/ADS + **DACL 保留**，仅所有者未复制（归执行者）",
+            _ => "数据/属性/时间戳/ADS 保留，**DACL 与所有者均未复制**（目标继承目标卷权限）",
+        };
+
+        return $"安全信息档位自动降级：{SwitchOf(initial)} → {SwitchOf(final)}"
+               + $"（{SwitchOf(failedAt)} 失败：{cause}）。当前：{kept}。"
+               + "如需完整保留属性，请以管理员身份重新执行。";
     }
 
     /// <summary>
@@ -123,11 +163,11 @@ public sealed class RobocopyCopier : IFileCopier
 
     /// <summary>执行一次 robocopy。</summary>
     private async Task<CopyResult> RunOnceAsync(
-        string source, string target, CopyOptions options, bool useCopyAll,
+        string source, string target, CopyOptions options, SecurityMode mode,
         IProgress<CopyProgress>? progress, CancellationToken cancellationToken)
     {
         var logPath = Path.Combine(Path.GetTempPath(), $"dirporter-robocopy-{Guid.NewGuid():N}.log");
-        var arguments = BuildArguments(source, target, options, logPath, useCopyAll);
+        var arguments = BuildArguments(source, target, options, logPath, mode);
 
         var stopwatch = Stopwatch.StartNew();
         using var process = new Process
@@ -183,6 +223,22 @@ public sealed class RobocopyCopier : IFileCopier
         return summary with { RawLogPath = archivedLog, Elapsed = stopwatch.Elapsed };
     }
 
+    /// <summary>安全信息档位（从高到低）。降级链：CopyAll → Datso → Dats → Dat。</summary>
+    public enum SecurityMode
+    {
+        /// <summary>/COPYALL：数据+属性+时间戳+SACL+所有者+审计。</summary>
+        CopyAll,
+
+        /// <summary>/COPY:DATSO：保留 DACL + 所有者，缺审计 SACL。</summary>
+        Datso,
+
+        /// <summary>/COPY:DATS：保留 DACL，放弃所有者。</summary>
+        Dats,
+
+        /// <summary>/COPY:DAT：仅数据+属性+时间戳。</summary>
+        Dat,
+    }
+
     /// <summary>当前权限下将使用的安全信息复制开关（供 Dry-run 与日志复现）。</summary>
     public static string DescribeCopySwitch(bool isElevated, bool copySecurity = true)
     {
@@ -198,20 +254,19 @@ public sealed class RobocopyCopier : IFileCopier
     /// 构造固定参数集。参数顺序与内容都刻意固定，便于日志复盘与回归对比。
     /// </summary>
     public static List<string> BuildArguments(string source, string target, CopyOptions options, string logPath, bool useCopyAll = true)
-    {
-        // R12.17 修复：此前这里写死 useCopyAll ? /COPYALL : /COPY:DATSO，
-        // 完全忽略 options.CopySecurity —— `--no-security` 对 robocopy 引擎无效，
-        // 于是非提权环境仍在逐文件复制所有者信息，全部报「错误 5」并整体回滚。
-        var copySwitch = !options.CopySecurity
-            ? "/COPY:DAT"
-            : useCopyAll ? "/COPYALL" : "/COPY:DATSO";
+        => BuildArguments(source, target, options, logPath,
+            !options.CopySecurity ? SecurityMode.Dat : useCopyAll ? SecurityMode.CopyAll : SecurityMode.Datso);
 
+    /// <summary>按显式档位构造参数（降级链内部使用）。</summary>
+    internal static List<string> BuildArguments(
+        string source, string target, CopyOptions options, string logPath, SecurityMode mode)
+    {
         var arguments = new List<string>
         {
             source,
             target,
             "/E",                 // 复制子目录（含空目录）
-            copySwitch,           // 安全信息档位（受 --no-security 控制）
+            SwitchOf(mode),       // 安全信息档位（R12.17：受 --no-security 控制；R12.18：支持逐级降级）
             "/DCOPY:DAT",         // 目录：数据 + 属性 + 时间戳
             "/R:" + options.RetryCount,
             "/W:" + options.RetryWaitSeconds,
